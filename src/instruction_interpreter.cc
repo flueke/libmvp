@@ -10,7 +10,7 @@ void run_instructions(const InstructionList &instructions, Flash *m_flash, uchar
 {
   for (auto instr: instructions) {
     m_flash->write_memory(instr.address + address_offset, section,
-        gsl::as_span(instr.data));
+        gsl::span(instr.data));
   }
 }
 

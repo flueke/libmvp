@@ -13,7 +13,7 @@
 #include <functional>
 #include <system_error>
 
-#include <gsl.h>
+#include <gsl/gsl-lite.h>
 
 #define QSL(str) QStringLiteral(str)
 
@@ -33,12 +33,12 @@ class ThreadMover
       : m_object(object)
       , m_thread(object->thread())
     {
-      qDebug() << this << "moving" << object << "to target thread" << target_thread;
+      qDebug() << this << "moving" << object.get() << "to target thread" << target_thread;
 
       m_object->moveToThread(target_thread);
 
       if (m_object->thread() != target_thread)
-        throw std::runtime_error("initial thread move failed"); 
+        throw std::runtime_error("initial thread move failed");
     }
 
     ~ThreadMover()

@@ -77,7 +77,7 @@ void FirmwareWriter::write_part(const FirmwarePartPtr &pp,
       emit status_message(QString("File %1: writing %2 bytes of data")
           .arg(pp->get_filename()).arg(contents.size()));
 
-      m_flash->write_memory({0, 0, 0}, section, gsl::as_span(contents));
+      m_flash->write_memory({0, 0, 0}, section, gsl::span(contents));
     }
 
     if (!contents.isEmpty() && do_verify()) {
@@ -85,7 +85,7 @@ void FirmwareWriter::write_part(const FirmwarePartPtr &pp,
           .arg(pp->get_filename()));
 
 
-      auto res = m_flash->verify_memory({0, 0, 0}, section, gsl::as_span(contents));
+      auto res = m_flash->verify_memory({0, 0, 0}, section, gsl::span(contents));
       if (!res) throw FlashVerificationError(res);
     }
   } else if (is_instruction_part(pp) && !is_key_part(pp)) {
@@ -105,14 +105,14 @@ void FirmwareWriter::write_part(const FirmwarePartPtr &pp,
         emit status_message(QString("File %1: writing %2 bytes of data")
             .arg(pp->get_filename()).arg(mem.size()));
 
-        m_flash->write_memory({0, 0, 0}, section, gsl::as_span(mem));
+        m_flash->write_memory({0, 0, 0}, section, gsl::span(mem));
       }
 
       if (do_verify()) {
         emit status_message(QString("File %1: verifying memory")
             .arg(pp->get_filename()));
 
-        auto res = m_flash->verify_memory({0, 0, 0}, section, gsl::as_span(mem));
+        auto res = m_flash->verify_memory({0, 0, 0}, section, gsl::span(mem));
 
         qDebug() << res.to_string();
 
@@ -134,7 +134,7 @@ void FirmwareWriter::write_part(const FirmwarePartPtr &pp,
 
         auto mem = generate_memory(instructions);
 
-        auto res = m_flash->verify_memory({0, 0, 0}, section, gsl::as_span(mem));
+        auto res = m_flash->verify_memory({0, 0, 0}, section, gsl::span(mem));
         qDebug() << res.to_string();
         if (!res) throw FlashVerificationError(res);
       }

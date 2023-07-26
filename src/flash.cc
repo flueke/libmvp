@@ -134,7 +134,7 @@ void BasicFlash::write_page(const Address &addr, uchar section,
   if (use_verbose) {
     try {
       //QVector<uchar> rbuf(use_verbose ? 4 + data.size() : 4);
-      //read(gsl::as_span(rbuf));
+      //read(gsl::span(rbuf));
       auto rbuf = read_available();
       qDebug() << "write_page: try read yielded" << rbuf;
     } catch (const std::exception &e) {
@@ -173,7 +173,7 @@ QVector<uchar> BasicFlash::read_page(const Address &addr, uchar section,
   size_t len, int timeout_ms)
 {
   QVector<uchar> ret(len);
-  read_page(addr, section, gsl::as_span(ret), timeout_ms);
+  read_page(addr, section, gsl::span(ret), timeout_ms);
   return ret;
 }
 
@@ -205,7 +205,7 @@ void BasicFlash::read_response(QVector<uchar> &buf, size_t len, int timeout_ms)
 {
   buf.clear();
   buf.resize(len);
-  auto span = gsl::as_span(buf);
+  auto span = gsl::span(buf);
   read_response(span, timeout_ms);
 }
 
@@ -428,7 +428,7 @@ void Flash::write_memory(const Address &start, uchar section, const gsl::span<uc
   while (remaining) {
     emit progress_changed(progress++);
     auto len = std::min(constants::page_size, remaining);
-    write_page(addr, section, gsl::as_span(data.data() + offset, len));
+    write_page(addr, section, gsl::span(data.data() + offset, len));
 
     remaining -= len;
     addr      += len;
@@ -461,7 +461,7 @@ QVector<uchar> Flash::read_memory(const Address &start, uchar section,
     emit progress_changed(progress++);
 
     auto rl = std::min(chunk_size, remaining);
-    auto page_span = gsl::as_span(ret.data() + offset, rl);
+    auto page_span = gsl::span(ret.data() + offset, rl);
     read_page(addr, section, page_span);
 
     offset    += rl;

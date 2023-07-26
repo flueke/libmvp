@@ -3,7 +3,7 @@
 
 #include <QString>
 #include <QDebug>
-#include <gsl.h>
+#include <gsl/gsl-lite.h>
 #include "flash_constants.h"
 
 namespace mesytec
