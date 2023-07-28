@@ -199,17 +199,17 @@ QString format_bytes(const U &bytes)
 template <typename T, typename U>
 T &format_bytes(T &stream, const U &bytes)
 {
-  stream << qSetFieldWidth(2) << qSetPadChar('0') << hex;
+  stream << qSetFieldWidth(2) << qSetPadChar('0') << Qt::hex;
 
   size_t i=0;
 
   for (uchar c: bytes) {
-    stream << qSetFieldWidth(2) << qSetPadChar('0') << hex;
+    stream << qSetFieldWidth(2) << qSetPadChar('0') << Qt::hex;
     stream << c;
-    stream << reset << " ";
+    stream << Qt::reset << " ";
 
     if ((++i % 16) == 0)
-      stream << endl;
+      stream << Qt::endl;
   }
   return stream;
 }

@@ -1,6 +1,10 @@
 #ifndef UUID_33abc8f6_2854_4d53_b87e_98acd08a586b
 #define UUID_33abc8f6_2854_4d53_b87e_98acd08a586b
 
+#include <algorithm>
+#include <QSet>
+#include <QString>
+
 namespace mesytec
 {
 namespace mvp
@@ -119,8 +123,8 @@ namespace mvp
 
   inline QList<uchar> get_valid_sections()
   {
-    auto ret = constants::valid_sections.toList();
-    qSort(ret);
+    auto ret = constants::valid_sections.values();
+    std::sort(std::begin(ret), std::end(ret));
     return ret;
   }
 

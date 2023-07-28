@@ -1,4 +1,5 @@
 #include "firmware_ops.h"
+#include <algorithm>
 #include "flash.h"
 #include "instruction_interpreter.h"
 
@@ -266,7 +267,7 @@ void KeysHandler::write_keys()
     m_flash->erase_section(constants::keys_section);
   }
 
-  auto free_slots = m_flash->get_free_key_slots().toList();
+  auto free_slots = m_flash->get_free_key_slots().values();
 
   /* This should not happen as we'd either have more than max_keys keys or
    * erase and get_free_key_slots() would not work properly. */
@@ -274,7 +275,7 @@ void KeysHandler::write_keys()
     throw std::runtime_error("Too many keys to write");
   }
 
-  qSort(free_slots);
+  std::sort(std::begin(free_slots), std::end(free_slots));
 
   qDebug() << "write_keys: free slots =" << free_slots;
 

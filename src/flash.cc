@@ -550,8 +550,9 @@ KeyMap Flash::read_keys()
 QSet<size_t> Flash::get_used_key_slots()
 {
   auto keymap = read_keys();
+  auto keys = keymap.keys();
 
-  return QSet<size_t>::fromList(keymap.keys());
+  return QSet<size_t>(std::begin(keys), std::end(keys));
 }
 
 QSet<size_t> Flash::get_free_key_slots()
