@@ -4,7 +4,7 @@
 #include <QMap>
 #include <QString>
 #include <QDebug>
-#include <gsl/gsl-lite.h>
+#include <gsl/gsl-lite.hpp>
 #include "flash_address.h"
 #include "util.h"
 

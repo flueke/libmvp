@@ -13,7 +13,7 @@
 #include <functional>
 #include <system_error>
 
-#include <gsl/gsl-lite.h>
+#include <gsl/gsl-lite.hpp>
 
 #define QSL(str) QStringLiteral(str)
 

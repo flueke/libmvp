@@ -4,7 +4,7 @@
 #include <QList>
 #include <QObject>
 #include <QSerialPortInfo>
-#include <gsl/gsl-lite.h>
+#include <gsl/gsl-lite.hpp>
 #include <functional>
 
 namespace mesytec
