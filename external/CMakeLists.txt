@@ -54,3 +54,6 @@ if(NOT nng)
     set(NNG_ENABLE_NNGCAT OFF)
     add_subdirectory(nng)
 endif()
+
+# libmvp - mesytec vme programmer library
+add_subdirectory(libmvp)
