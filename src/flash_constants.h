@@ -2,6 +2,7 @@
 #define UUID_33abc8f6_2854_4d53_b87e_98acd08a586b
 
 #include <algorithm>
+#include <QMap>
 #include <QSet>
 #include <QString>
 

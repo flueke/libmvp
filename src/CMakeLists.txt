@@ -63,6 +63,11 @@ target_link_libraries(libmvp
     PUBLIC Qt5::Widgets
 )
 
+target_include_directories(libmvp
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    )
+
 include(GenerateExportHeader)
 generate_export_header(libmvp)
 
