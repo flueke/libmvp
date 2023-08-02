@@ -11,7 +11,8 @@ size_t get_default_mem_read_chunk_size()
 {
 #ifdef Q_OS_WIN
   // Workaround for Qt versions starting from 5.12: reading larger amounts of
-  // data (e.g. a full 256 byte page) in one go leads to a read timeout.
+  // data (e.g. a full 256 byte page) in one go from the serial port leads to a
+  // read timeout.
   // Dividing the page into smaller  chunks fixes the problem.
   // See https://bugreports.qt.io/browse/QTBUG-93865 for more info.
   const size_t chunk_size = constants::page_size / 8;

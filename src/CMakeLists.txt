@@ -66,6 +66,7 @@ target_link_libraries(libmvp
 target_include_directories(libmvp
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    #PUBLIC $<INSTALL_INTERFACE:include>
     )
 
 include(GenerateExportHeader)

@@ -1,10 +1,11 @@
 #ifndef UUID_1b258d8d_e521_438d_b374_64a974cf2e1e
 #define UUID_1b258d8d_e521_438d_b374_64a974cf2e1e
 
-#include <QMap>
-#include <QString>
-#include <QDebug>
 #include <gsl/gsl-lite.hpp>
+#include <QDebug>
+#include <QMap>
+#include <QObject>
+#include <QString>
 #include "flash_address.h"
 #include "util.h"
 
