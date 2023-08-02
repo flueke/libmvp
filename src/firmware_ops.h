@@ -8,7 +8,6 @@ namespace mesytec
 namespace mvp
 {
 
-class PortHelper;
 class Flash;
 
 class FirmwareWriter: public QObject
@@ -19,7 +18,6 @@ class FirmwareWriter: public QObject
 
   public:
     FirmwareWriter(const FirmwareArchive &firmware,
-        PortHelper *port_helper,
         Flash *flash,
         QObject *parent = nullptr);
 
@@ -39,7 +37,6 @@ class FirmwareWriter: public QObject
         const boost::optional<uchar> &area = boost::none);
 
     FirmwareArchive m_firmware;
-    PortHelper *m_port_helper = nullptr;
     Flash *m_flash = nullptr;
 
     bool m_do_erase = true;
@@ -100,7 +97,6 @@ class KeysHandler: public QObject
   public:
     KeysHandler(
         const FirmwareArchive &firmware,
-        gsl::not_null<PortHelper *> port_helper,
         gsl::not_null<Flash *> flash,
         QObject *parent = nullptr);
 
@@ -110,7 +106,6 @@ class KeysHandler: public QObject
 
   private:
     FirmwareArchive m_firmware;
-    PortHelper *m_port_helper = nullptr;
     Flash *m_flash = nullptr;
     bool m_keys_info_read = false;
     KeysInfo m_keys_info;
