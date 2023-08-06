@@ -41,6 +41,19 @@ namespace mvp
       QVector<uchar> m_response;
   };
 
+  #if 0
+  class FlashInterface
+  {
+    public:
+
+      virtual void write_page(const Address &address, uchar section,
+        const gsl::span<uchar> data, int timeout_ms = constants::data_timeout_ms);
+
+      virtual void read_page(const Address &address, uchar section, gsl::span<uchar> dest,
+        int timeout_ms = constants::data_timeout_ms);
+  };
+  #endif
+
   class BasicFlash: public QObject
   {
     Q_OBJECT
