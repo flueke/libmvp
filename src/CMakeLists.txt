@@ -629,9 +629,9 @@ add_mvme_exe(mvme_crateconfig_tool mvlc/mvme_crateconfig_tool.cc)
 install(TARGETS mvme_crateconfig_tool RUNTIME DESTINATION bin LIBRARY DESTINATION lib)
 
 # flashing mdpp/vmmr/mvlc modules through vme
-add_mvme_exe(mvme_firmware_tool mvme_firmware_tool.cc)
-target_link_libraries(mvme_firmware_tool PRIVATE libmvp)
-install(TARGETS mvme_firmware_tool RUNTIME DESTINATION bin LIBRARY DESTINATION lib)
+add_mvme_exe(vme_firmware_updater vme_firmware_updater.cc)
+target_link_libraries(vme_firmware_updater PRIVATE libmvp argh)
+install(TARGETS vme_firmware_updater RUNTIME DESTINATION bin LIBRARY DESTINATION lib)
 
 # automated gtests
 if(MVME_BUILD_TESTS)
