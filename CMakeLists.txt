@@ -147,6 +147,8 @@ if (MVME_BUILD_TESTS)
     enable_testing()
 endif()
 
+option(MVME_BUILD_DEV_TOOLS "Build mvme dev tools" OFF)
+
 # Subdirectories containing build targets
 add_subdirectory(src)
 add_subdirectory(extras)
