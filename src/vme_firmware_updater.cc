@@ -1,14 +1,10 @@
-#include <flash_constants.h>
-#include <mesytec-mvlc/mesytec-mvlc.h>
+#include <filesystem>
 #include <mesytec-mvlc/scanbus_support.h>
-#include <mesytec-mvlc/mvlc_mvp_lib.h>
+#include "mvlc/mvlc_mvp_lib.h"
+#include "mvlc/mvlc_mvp_flash.h"
 
-// * mvlc connection using standard params
-// * scanbus for candidates to update. show firmware revisions
-// * vme_address specific:
-//   - read_page, write_page
-//   - erase section
-//   - write firmware
+using namespace mesytec::mvme_mvlc;
+using namespace mesytec::mvme_mvlc::mvp;
 
 // https://stackoverflow.com/a/24900770
 inline std::string unindent(const char* p)
@@ -132,8 +128,13 @@ struct CliContext
     argh::parser parser;
 };
 
+// ========================================================================
+// Command implementations start here
+// ========================================================================
+
 DEF_EXEC_FUNC(list_commands_command)
 {
+    (void) self; (void) argc; (void) argv;
     spdlog::trace("entered list_commands_command()");
     trace_log_parser_info(ctx.parser, "list_commands_command");
 
@@ -155,6 +156,7 @@ static const Command ListCmdsCommand =
 
 DEF_EXEC_FUNC(scanbus_command)
 {
+    (void) self; (void) argc; (void) argv;
     spdlog::trace("entered mvlc_scanbus_command()");
 
     auto parser = ctx.parser;
@@ -338,7 +340,7 @@ std::error_code dump_memory(
     size_t len,
     std::vector<u8> &dest)
 {
-    static const size_t ChunkSize = mvp::constants::page_size;
+    static const size_t ChunkSize = mesytec::mvp::constants::page_size;
 
     dest.reserve(len);
     u32 addr = memAddress;
@@ -375,12 +377,13 @@ std::error_code dump_memory(
 
 DEF_EXEC_FUNC(dump_memory_command)
 {
+    (void) self; (void) argc; (void) argv;
     spdlog::trace("entered dump_memory_command()");
     u32 vmeAddress = 0x0u;
     unsigned area = 0;
     unsigned memAddress = 0;
     unsigned section = 0;
-    size_t len = mvp::constants::page_size;
+    size_t len = mesytec::mvp::constants::page_size;
     std::string str;
 
     auto parser = ctx.parser;
@@ -433,10 +436,126 @@ static const Command DumpMemoryCommand
     .exec = dump_memory_command,
 };
 
+DEF_EXEC_FUNC(write_firmware_command)
+{
+    (void) self; (void) argc; (void) argv;
+    spdlog::trace("entered write_firmware_command()");
+
+    using namespace mesytec::mvme_mvlc::mvp;
+
+    u32 vmeAddress = 0;
+    unsigned area = 0;
+    std::string firmwareInput;
+
+    auto parser = ctx.parser;
+    parser.add_params({"--vme-address", "--area", "--firmware"});
+    parser.parse(argv);
+    trace_log_parser_info(parser, "write_firmware_command");
+
+    if (!parse_into(parser, "--vme-address", vmeAddress, convert_to_unsigned))
+        return 1;
+
+    if (!parse_into(parser, "--area", area, convert_to_unsigned))
+        return 1;
+
+    if (!(parser("--firmware") >> firmwareInput))
+    {
+        std::cerr << "Error: missing --firmware <file|dir> parameter!\n";
+        return 1;
+    }
+
+    mesytec::mvp::FirmwareArchive firmware;
+    namespace fs = std::filesystem;
+
+    auto st = fs::status(firmwareInput);
+    auto qFirmwareInput = QString::fromStdString(firmwareInput);
+
+    try
+    {
+        if (st.type() == fs::file_type::directory)
+            firmware = mesytec::mvp::from_dir(qFirmwareInput);
+        else
+        {
+            auto ext = str_tolower(fs::path(firmwareInput).extension());
+            if (ext == ".bin" || ext == ".key" || ext == ".hex")
+                firmware = mesytec::mvp::from_single_file(qFirmwareInput);
+            else
+                firmware = mesytec::mvp::from_zip(qFirmwareInput);
+        }
+
+        if (firmware.is_empty())
+        {
+            std::cerr << "Error: empty firmware data from " << firmwareInput << "\n";
+            return 1;
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << fmt::format("Error reading firmware from {}: {}\n", firmwareInput, e.what());
+        return 1;
+    }
+
+    auto [mvlc, ec] = make_and_connect_default_mvlc(ctx.parser);
+
+    if (!mvlc || ec)
+        return 1;
+
+    try
+    {
+        MvlcMvpFlash flash(mvlc, vmeAddress);
+        mesytec::mvp::FirmwareWriter writer(firmware, &flash);
+        int maxProgress = 0u;
+
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_range_changed, [&maxProgress] (int min, int max) {
+            std::cout << fmt::format("FlashInterface::progressRange: [{}, {}]\n", min, max);
+            maxProgress = max;
+        });
+
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_changed, [&maxProgress] (int progress) {
+            std::cout << fmt::format("FlashInterface::progress: {}/{}\n", progress, maxProgress);
+        });
+
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_text_changed, [] (const QString &txt) {
+            std::cout << fmt::format("FlashInterface::progressText: {}\n", txt.toStdString());
+        });
+
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::statusbyte_received, [] (const u8 &status) {
+            std::cout << fmt::format("FlashInterface::statusbyte: 0x{:02x}\n", status);
+        });
+
+        QObject::connect(&writer, &mesytec::mvp::FirmwareWriter::status_message, [] (const QString &msg) {
+            std::cout << "FirmwareWriter status: " << msg.toStdString() << "\n";
+        });
+
+        writer.write();
+    } catch (const std::exception &e)
+    {
+        std::cerr << fmt::format("Error writing firmware to VME address 0x{:08x}: {}\n", vmeAddress, e.what());
+        return 1;
+    }
+
+    return 0;
+}
+
+static const Command WriteFirmwareCommand
+{
+    .name = "write-firmware",
+    .help = unindent(R"~(
+)~"),
+    .exec = write_firmware_command,
+};
+
+inline Command make_command(const std::string &name)
+{
+    Command ret;
+    ret.name = name;
+    return ret;
+}
+
 int main(int argc, char *argv[])
 {
-    spdlog::set_level(spdlog::level::warn);
-    mesytec::mvlc::set_global_log_level(spdlog::level::warn);
+    spdlog::set_level(spdlog::level::info);
+    mesytec::mvlc::set_global_log_level(spdlog::level::info);
 
     argh::parser parser({"-h", "--help", "--log-level", "--trace", "--debug"});
     add_mvlc_standard_params(parser);
@@ -460,12 +579,13 @@ int main(int argc, char *argv[])
     ctx.commands.insert(ListCmdsCommand);
     ctx.commands.insert(ScanbusCommand);
     ctx.commands.insert(DumpMemoryCommand);
+    ctx.commands.insert(WriteFirmwareCommand);
 
     {
         std::string cmdName;
         if ((parser({"-h", "--help"}) >> cmdName))
         {
-            if (auto cmd = ctx.commands.find(Command{cmdName});
+            if (auto cmd = ctx.commands.find(make_command(cmdName));
                 cmd != ctx.commands.end())
             {
                 std::cout << cmd->help;
@@ -481,7 +601,7 @@ int main(int argc, char *argv[])
 
     if (auto cmdName = parser[1]; !cmdName.empty())
     {
-        if (auto cmd = ctx.commands.find(Command{parser[1]});
+        if (auto cmd = ctx.commands.find(make_command(parser[1]));
             cmd != ctx.commands.end())
         {
             spdlog::trace("parsed cli: found cmd='{}'", cmd->name);
