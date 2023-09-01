@@ -9,7 +9,7 @@ namespace mvp
 {
 
 FirmwareWriter::FirmwareWriter(const FirmwareArchive &firmware,
-    Flash *flash, QObject *parent)
+    FlashInterface *flash, QObject *parent)
   : QObject(parent)
   , m_firmware(firmware)
   , m_flash(flash)
@@ -185,7 +185,7 @@ KeyList KeysInfo::get_new_firmware_keys() const
 
 KeysHandler::KeysHandler(
     const FirmwareArchive &firmware,
-    gsl::not_null<Flash *> flash,
+    gsl::not_null<FlashInterface *> flash,
     QObject *parent)
   : m_firmware(firmware)
   , m_flash(flash)

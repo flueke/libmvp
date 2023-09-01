@@ -112,6 +112,7 @@ namespace mvp
       }
 
       QString to_string() const;
+      std::array<uchar, 3> data() const { return _data; }
 
     private:
       std::array<uchar, 3> _data = {{0, 0, 0}};
