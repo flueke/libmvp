@@ -61,6 +61,7 @@ target_link_libraries(libmvp
     PUBLIC Qt5::Network
     PUBLIC Qt5::SerialPort
     PUBLIC Qt5::Widgets
+    PUBLIC gsl::gsl-lite-v0
 )
 
 target_include_directories(libmvp

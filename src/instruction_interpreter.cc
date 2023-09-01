@@ -5,8 +5,8 @@ namespace mesytec
 namespace mvp
 {
 
-void run_instructions(const InstructionList &instructions, Flash *m_flash, uchar section,
-    size_t address_offset)
+void run_instructions(const InstructionList &instructions, FlashInterface *m_flash,
+  uchar section, size_t address_offset)
 {
   for (auto instr: instructions) {
     m_flash->write_memory(instr.address + address_offset, section,
