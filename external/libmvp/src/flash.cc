@@ -24,7 +24,183 @@ size_t get_default_mem_read_chunk_size()
 
 using constants::access_code;
 
-void BasicFlash::nop()
+FlashInterface::~FlashInterface() {}
+
+void FlashInterface::read_response(QVector<uchar> &buf, size_t len, int timeout_ms)
+{
+  buf.clear();
+  buf.resize(len);
+  auto span = gsl::span(buf);
+  read_response(span, timeout_ms);
+}
+
+QVector<uchar> FlashInterface::read_page(const Address &addr, uchar section,
+  size_t len, int timeout_ms)
+{
+  QVector<uchar> ret(len);
+  read_page(addr, section, gsl::span(ret), timeout_ms);
+  return ret;
+}
+
+void FlashInterface::ensure_response_ok(
+  const gsl::span<uchar> &instruction,
+  const gsl::span<uchar> &response)
+{
+  if (response.size() < 2) {
+    throw FlashInstructionError(instruction, response, "short response (size<2)");
+  }
+
+  if (!std::equal(std::begin(instruction), std::end(instruction),
+        std::begin(response))) {
+    throw FlashInstructionError(instruction, response,
+      "response contents do not equal instruction contents");
+  }
+
+  try {
+    const gsl::span<uchar> response_code{std::begin(response) + (response.size() - 2),
+          std::end(response)};
+    m_last_status = *(response_code.begin()+1);
+    emit statusbyte_received(m_last_status);
+    ensure_response_code_ok(response_code);
+  } catch (const std::runtime_error &e) {
+    m_write_enabled = false; // write enable is unset on error
+    throw FlashInstructionError(instruction, response, e.what());
+  }
+}
+
+void FlashInterface::ensure_response_code_ok(const gsl::span<uchar> &response_code) const
+{
+  if (response_code.size() != 2)
+    throw std::runtime_error("invalid response code size (expected size=2)");
+
+  if (0xff != *std::begin(response_code))
+    throw std::runtime_error("invalid response code start (expected 0xff)");
+
+  if (!(status::inst_success & (*(std::begin(response_code)+1))))
+    throw std::runtime_error("instruction failed");
+}
+
+void SerialPortFlash::recover(size_t tries)
+{
+  std::exception_ptr last_nop_exception;
+
+  qDebug() << "begin recover(): tries =" << tries;
+
+  for (size_t n=0; n<tries; ++n) {
+    try {
+      auto data = read_available(constants::recover_timeout_ms);
+      qDebug() << "recover(): read_available():" << format_bytes(data);
+    } catch (const ComError &e) {
+      qDebug() << "ignoring ComError from read_available()";
+    }
+
+    try {
+      nop();
+      return;
+    } catch (const std::exception &e) {
+      last_nop_exception = std::current_exception();
+      qDebug() << "Flash::recover(): exception from NOP" << e.what();
+    }
+  }
+
+  if (last_nop_exception)
+    std::rethrow_exception(last_nop_exception);
+  else
+    throw std::runtime_error("NOP recovery failed for an unknown reason");
+}
+
+void FlashInterface::ensure_clean_state()
+{
+  // FIXME: leftover bytes need to be logged
+  qDebug() << "begin ensure_clean_state";
+  recover();
+  qDebug() << "end ensure_clean_state";
+}
+
+
+void FlashInterface::write_memory(const Address &start, uchar section,
+  const gsl::span<uchar> data)
+{
+  Address addr(start);
+  size_t remaining = data.size();
+  size_t offset    = 0;
+
+  emit progress_range_changed(0, std::max(static_cast<int>(remaining / constants::page_size), 1));
+  int progress = 0;
+
+  while (remaining) {
+    emit progress_changed(progress++);
+    auto len = std::min(constants::page_size, remaining);
+    write_page(addr, section, gsl::span(data.data() + offset, len));
+
+    remaining -= len;
+    addr      += len;
+    offset    += len;
+  }
+}
+
+QVector<uchar> FlashInterface::read_memory(const Address &start, uchar section,
+  size_t len, size_t chunk_size, EarlyReturnFun early_return_fun)
+{
+  qDebug() << "read_memory: start =" << start
+           << ", section =" << section
+           << ", len =" << len
+           << ", chunk_size =" << chunk_size
+           << ", early return function set =" << bool(early_return_fun);
+
+  QVector<uchar> ret(len);
+
+  Address addr(start);
+  size_t remaining = len;
+  size_t offset    = 0;
+
+
+  emit progress_range_changed(0, std::max(static_cast<int>(remaining / chunk_size), 1));
+  int progress = 0;
+
+  set_verbose(false);
+
+  while (remaining) {
+    emit progress_changed(progress++);
+
+    auto rl = std::min(chunk_size, remaining);
+    auto page_span = gsl::span(ret.data() + offset, rl);
+    read_page(addr, section, page_span);
+
+    offset    += rl;
+
+    if (early_return_fun && early_return_fun(addr, section, page_span)) {
+      ret.resize(offset);
+      return ret;
+    }
+
+    remaining -= rl;
+    addr      += rl;
+  }
+
+  return ret;
+}
+
+VerifyResult FlashInterface::verify_memory(const Address &start, uchar section,
+  const gsl::span<uchar> data)
+{
+  set_verbose(false);
+
+  auto fun = [&](const Address &addr, uchar, const gsl::span<uchar> page) {
+    auto res = std::mismatch(page.begin(), page.end(), data.begin() + addr.to_int());
+    return res.first != page.end();
+  };
+
+  auto mem = read_memory(start, section, data.size(), get_default_mem_read_chunk_size(), fun);
+  auto res = std::mismatch(mem.begin(), mem.end(), data.begin());
+
+  if (res.first == mem.end())
+    return VerifyResult();
+
+  return VerifyResult(res.second - data.begin(), *res.second, *res.first);
+}
+
+void FlashInterface::nop()
 {
   m_wbuf = { opcodes::NOP };
   write_instruction(m_wbuf);
@@ -32,7 +208,7 @@ void BasicFlash::nop()
   ensure_response_ok(m_wbuf, m_rbuf);
 }
 
-void BasicFlash::set_area_index(uchar area_index)
+void FlashInterface::set_area_index(uchar area_index)
 {
   m_wbuf = { opcodes::SAI, access_code[0], access_code[1], area_index };
 
@@ -41,7 +217,7 @@ void BasicFlash::set_area_index(uchar area_index)
   ensure_response_ok(m_wbuf, m_rbuf);
 }
 
-uchar BasicFlash::read_area_index()
+uchar FlashInterface::read_area_index()
 {
   m_wbuf = { opcodes::RAI };
 
@@ -51,7 +227,7 @@ uchar BasicFlash::read_area_index()
   return m_rbuf[1];
 }
 
-void BasicFlash::set_verbose(bool verbose)
+void FlashInterface::set_verbose(bool verbose)
 {
   qDebug() << "set_verbose:" << verbose;
   uchar veb = verbose ? 0 : 1;
@@ -62,7 +238,7 @@ void BasicFlash::set_verbose(bool verbose)
   m_verbose = verbose;
 }
 
-void BasicFlash::boot(uchar area_index)
+void FlashInterface::boot(uchar area_index)
 {
   m_wbuf = { opcodes::BFP, access_code[0], access_code[1], area_index };
   write_instruction(m_wbuf);
@@ -70,7 +246,7 @@ void BasicFlash::boot(uchar area_index)
   ensure_response_ok(m_wbuf, m_rbuf);
 }
 
-void BasicFlash::enable_write()
+void FlashInterface::enable_write()
 {
   qDebug() << "begin enable_write";
 
@@ -83,7 +259,7 @@ void BasicFlash::enable_write()
   qDebug() << "end enable_write: set write_enable flag";
 }
 
-void BasicFlash::erase_section(uchar index)
+void FlashInterface::erase_section(uchar index)
 {
   maybe_enable_write();
   m_wbuf = { opcodes::ERF, 0, 0, 0, index };
@@ -92,7 +268,7 @@ void BasicFlash::erase_section(uchar index)
   ensure_response_ok(m_wbuf, m_rbuf);
 }
 
-uchar BasicFlash::read_hardware_id()
+uchar FlashInterface::read_hardware_id()
 {
   m_wbuf = { opcodes::RDI };
   write_instruction(m_wbuf);
@@ -101,7 +277,7 @@ uchar BasicFlash::read_hardware_id()
   return m_rbuf[1];
 }
 
-void BasicFlash::write_page(const Address &addr, uchar section,
+void SerialPortFlash::write_page(const Address &addr, uchar section,
   const gsl::span<uchar> data, int timeout_ms)
 {
   //if (addr[0] != 0)
@@ -144,7 +320,7 @@ void BasicFlash::write_page(const Address &addr, uchar section,
   }
 }
 
-void BasicFlash::read_page(const Address &addr, uchar section,
+void SerialPortFlash::read_page(const Address &addr, uchar section,
   gsl::span<uchar> dest, int timeout_ms)
 {
   //if (addr[0] != 0)
@@ -170,15 +346,7 @@ void BasicFlash::read_page(const Address &addr, uchar section,
   read(dest, timeout_ms);
 }
 
-QVector<uchar> BasicFlash::read_page(const Address &addr, uchar section,
-  size_t len, int timeout_ms)
-{
-  QVector<uchar> ret(len);
-  read_page(addr, section, gsl::span(ret), timeout_ms);
-  return ret;
-}
-
-void BasicFlash::write_instruction(const gsl::span<uchar> data, int timeout_ms)
+void SerialPortFlash::write_instruction(const gsl::span<uchar> data, int timeout_ms)
 {
   write(data, timeout_ms);
 
@@ -196,21 +364,13 @@ void BasicFlash::write_instruction(const gsl::span<uchar> data, int timeout_ms)
   emit instruction_written(span_to_qvector(data));
 }
 
-void BasicFlash::read_response(gsl::span<uchar> dest, int timeout_ms)
+void SerialPortFlash::read_response(gsl::span<uchar> dest, int timeout_ms)
 {
   read(dest, timeout_ms);
   emit response_read(span_to_qvector(dest));
 }
 
-void BasicFlash::read_response(QVector<uchar> &buf, size_t len, int timeout_ms)
-{
-  buf.clear();
-  buf.resize(len);
-  auto span = gsl::span(buf);
-  read_response(span, timeout_ms);
-}
-
-void BasicFlash::write(const gsl::span<uchar> data, int timeout_ms)
+void SerialPortFlash::write(const gsl::span<uchar> data, int timeout_ms)
 {
   qint64 res = m_port->write(reinterpret_cast<const char *>(data.data()), data.size());
 
@@ -220,7 +380,7 @@ void BasicFlash::write(const gsl::span<uchar> data, int timeout_ms)
   }
 }
 
-void BasicFlash::read(gsl::span<uchar> dest, int timeout_ms)
+void SerialPortFlash::read(gsl::span<uchar> dest, int timeout_ms)
 {
   const auto len = dest.size();
 
@@ -243,7 +403,7 @@ void BasicFlash::read(gsl::span<uchar> dest, int timeout_ms)
   }
 }
 
-QVector<uchar> BasicFlash::read_available(int timeout_ms)
+QVector<uchar> SerialPortFlash::read_available(int timeout_ms)
 {
   if (!m_port->bytesAvailable() && !m_port->waitForReadyRead(timeout_ms))
     throw make_com_error(m_port);
@@ -260,44 +420,6 @@ QVector<uchar> BasicFlash::read_available(int timeout_ms)
   }
 
   return ret;
-}
-
-void BasicFlash::ensure_response_ok(
-  const gsl::span<uchar> &instruction,
-  const gsl::span<uchar> &response)
-{
-  if (response.size() < 2) {
-    throw FlashInstructionError(instruction, response, "short response (size<2)");
-  }
-
-  if (!std::equal(std::begin(instruction), std::end(instruction),
-        std::begin(response))) {
-    throw FlashInstructionError(instruction, response,
-      "response contents do not equal instruction contents");
-  }
-
-  try {
-    const gsl::span<uchar> response_code{std::begin(response) + (response.size() - 2),
-          std::end(response)};
-    m_last_status = *(response_code.begin()+1);
-    emit statusbyte_received(m_last_status);
-    ensure_response_code_ok(response_code);
-  } catch (const std::runtime_error &e) {
-    m_write_enabled = false; // write enable is unset on error
-    throw FlashInstructionError(instruction, response, e.what());
-  }
-}
-
-void BasicFlash::ensure_response_code_ok(const gsl::span<uchar> &response_code) const
-{
-  if (response_code.size() != 2)
-    throw std::runtime_error("invalid response code size (expected size=2)");
-
-  if (0xff != *std::begin(response_code))
-    throw std::runtime_error("invalid response code start (expected 0xff)");
-
-  if (!(status::inst_success & (*(std::begin(response_code)+1))))
-    throw std::runtime_error("instruction failed");
 }
 
 Key::Key(const QString &prefix, uint32_t sn, uint16_t sw, uint32_t key)
@@ -380,130 +502,7 @@ QString OTP::to_string() const
   return QString::fromStdString(fmt.str());
 }
 
-void Flash::recover(size_t tries)
-{
-  std::exception_ptr last_nop_exception;
-
-  qDebug() << "begin recover(): tries =" << tries;
-
-  for (size_t n=0; n<tries; ++n) {
-    try {
-      auto data = read_available(constants::recover_timeout_ms);
-      qDebug() << "recover(): read_available():" << format_bytes(data);
-    } catch (const ComError &e) {
-      qDebug() << "ignoring ComError from read_available()";
-    }
-
-    try {
-      nop();
-      return;
-    } catch (const std::exception &e) {
-      last_nop_exception = std::current_exception();
-      qDebug() << "Flash::recover(): exception from NOP" << e.what();
-    }
-  }
-
-  if (last_nop_exception)
-    std::rethrow_exception(last_nop_exception);
-  else
-    throw std::runtime_error("NOP recovery failed for an unknown reason");
-}
-
-void Flash::ensure_clean_state()
-{
-  // FIXME: leftover bytes need to be logged
-  qDebug() << "begin ensure_clean_state";
-  recover();
-  qDebug() << "end ensure_clean_state";
-}
-
-void Flash::write_memory(const Address &start, uchar section, const gsl::span<uchar> data)
-{
-  Address addr(start);
-  size_t remaining = data.size();
-  size_t offset    = 0;
-
-  emit progress_range_changed(0, std::max(static_cast<int>(remaining / constants::page_size), 1));
-  int progress = 0;
-
-  while (remaining) {
-    emit progress_changed(progress++);
-    auto len = std::min(constants::page_size, remaining);
-    write_page(addr, section, gsl::span(data.data() + offset, len));
-
-    remaining -= len;
-    addr      += len;
-    offset    += len;
-  }
-}
-
-QVector<uchar> Flash::read_memory(const Address &start, uchar section,
-  size_t len, size_t chunk_size, EarlyReturnFun early_return_fun)
-{
-  qDebug() << "read_memory: start =" << start
-           << ", section =" << section
-           << ", len =" << len
-           << ", chunk_size =" << chunk_size
-           << ", early return function set =" << bool(early_return_fun);
-
-  QVector<uchar> ret(len);
-
-  Address addr(start);
-  size_t remaining = len;
-  size_t offset    = 0;
-
-
-  emit progress_range_changed(0, std::max(static_cast<int>(remaining / chunk_size), 1));
-  int progress = 0;
-
-  set_verbose(false);
-
-  while (remaining) {
-    emit progress_changed(progress++);
-
-    auto rl = std::min(chunk_size, remaining);
-    auto page_span = gsl::span(ret.data() + offset, rl);
-    read_page(addr, section, page_span);
-
-    offset    += rl;
-
-    if (early_return_fun && early_return_fun(addr, section, page_span)) {
-      ret.resize(offset);
-      return ret;
-    }
-
-    remaining -= rl;
-    addr      += rl;
-  }
-
-  return ret;
-}
-
-VerifyResult Flash::verify_memory(const Address &start, uchar section, const gsl::span<uchar> data)
-{
-  set_verbose(false);
-
-  auto fun = [&](const Address &addr, uchar, const gsl::span<uchar> page) {
-    auto res = std::mismatch(page.begin(), page.end(), data.begin() + addr.to_int());
-    return res.first != page.end();
-  };
-
-  auto mem = read_memory(start, section, data.size(), get_default_mem_read_chunk_size(), fun);
-  auto res = std::mismatch(mem.begin(), mem.end(), data.begin());
-
-  if (res.first == mem.end())
-    return VerifyResult();
-
-  return VerifyResult(res.second - data.begin(), *res.second, *res.first);
-}
-
-void Flash::erase_section(uchar index)
-{
-  emit progress_range_changed(0, 0);
-  BasicFlash::erase_section(index);
-}
-
-VerifyResult Flash::blankcheck_section(uchar section, size_t size)
+VerifyResult FlashInterface::blankcheck_section(uchar section, size_t size)
 {
   emit progress_text_changed(QString("Blankchecking section %1 (sz=%2)")
       .arg(static_cast<int>(section))
@@ -527,7 +526,7 @@ VerifyResult Flash::blankcheck_section(uchar section, size_t size)
   return ret;
 }
 
-KeyMap Flash::read_keys()
+KeyMap FlashInterface::read_keys()
 {
   KeyMap ret;
 
@@ -548,7 +547,7 @@ KeyMap Flash::read_keys()
   return ret;
 }
 
-QSet<size_t> Flash::get_used_key_slots()
+QSet<size_t> FlashInterface::get_used_key_slots()
 {
   auto keymap = read_keys();
   auto keys = keymap.keys();
@@ -556,7 +555,7 @@ QSet<size_t> Flash::get_used_key_slots()
   return QSet<size_t>(std::begin(keys), std::end(keys));
 }
 
-QSet<size_t> Flash::get_free_key_slots()
+QSet<size_t> FlashInterface::get_free_key_slots()
 {
   auto used = get_used_key_slots();
   QSet<size_t> all_slots;
@@ -567,7 +566,7 @@ QSet<size_t> Flash::get_free_key_slots()
   return all_slots.subtract(used);
 }
 
-OTP Flash::read_otp()
+OTP FlashInterface::read_otp()
 {
 #ifdef Q_OS_WIN
   // Workaround for Qt versions starting from 5.12: reading larger amounts of
