@@ -2,10 +2,10 @@
 #include <chrono>
 #include <stdexcept>
 
-namespace mesytec
+namespace mesytec::mvme_mvlc::mvp
 {
-namespace mvlc
-{
+
+using namespace mesytec::mvlc;
 
 std::error_code enable_flash_interface(MVLC &mvlc, u32 moduleBase)
 {
@@ -131,6 +131,14 @@ std::error_code write_instruction(MVLC &mvlc, u32 moduleBase, const std::vector<
     }
 
     return {};
+}
+
+std::error_code write_instruction(MVLC &mvlc, u32 moduleBase, const gsl::span<unsigned char> instruction)
+{
+    std::vector<u8> tmp;
+    tmp.reserve(instruction.size());
+    std::copy(std::begin(instruction), std::end(instruction), std::back_inserter(tmp));
+    return write_instruction(mvlc, moduleBase, tmp);
 }
 
 std::error_code read_response(MVLC &mvlc, u32 moduleBase, std::vector<u8> &dest)
@@ -393,6 +401,8 @@ std::error_code write_page2(
 
     auto pageIter = pageBuffer.begin();
 
+    spdlog::info("write_page2(): writing page of size {}", pageBuffer.size());
+
     while (pageIter != pageBuffer.end())
     {
         while (get_encoded_stack_size(sb) < MirrorTransactionMaxContentsWords / 2 - 2
@@ -559,5 +569,4 @@ std::error_code erase_section(
     return {};
 }
 
-}
 }

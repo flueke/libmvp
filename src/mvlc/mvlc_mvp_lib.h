@@ -2,12 +2,16 @@
 #define __MESYTEC_MVLC_MVP_LIB_H__
 
 #include <mesytec-mvlc/mesytec-mvlc.h>
+#include <gsl/gsl-lite.hpp>
 #include <stdexcept>
 
-namespace mesytec
+namespace mesytec::mvme_mvlc::mvp
 {
-namespace mvlc
-{
+
+using u8 = mvlc::u8;
+using u16 = mvlc::u16;
+using u32 = mvlc::u32;
+using MVLC = mvlc::MVLC;
 
 using FlashAddress = std::array<u8, 3>;
 
@@ -16,7 +20,7 @@ static const u16 InputFifoRegister = 0x6202;
 static const u16 OutputFifoRegister = 0x6204;
 static const u16 StatusRegister = 0x6206;
 static const size_t PageSize = 256;
-static const size_t SectorSize = util::Kilobytes(64);
+static const size_t SectorSize = mvlc::util::Kilobytes(64);
 static const size_t PagesPerSector = SectorSize / PageSize;
 static const size_t FlashAddressBits = 24;
 static const size_t FlashMaxAddress = (1u << FlashAddressBits) - 1;
@@ -72,6 +76,7 @@ std::error_code enable_flash_write(MVLC &mvlc, u32 moduleBase);
 std::error_code set_verbose_mode(MVLC &mvlc, u32 moduleBase, bool verbose);
 
 std::error_code write_instruction(MVLC &mvlc, u32 moduleBase, const std::vector<u8> &instruction);
+std::error_code write_instruction(MVLC &mvlc, u32 moduleBase, const gsl::span<unsigned char> instruction);
 std::error_code read_response(MVLC &mvlc, u32 moduleBase, std::vector<u8> &dest);
 bool check_response(const std::vector<u8> &request,
                     const std::vector<u8> &response);
@@ -111,7 +116,5 @@ void fill_page_buffer_from_stack_output(
     std::vector<u8> &pageBuffer, const std::vector<u32> stackOutput);
 
 }
-}
-
 
 #endif /* __MESYTEC_MVLC_MVP_LIB_H__ */
