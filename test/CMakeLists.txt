@@ -7,7 +7,7 @@ include_directories(${Boost_INCLUDE_DIRS} ${libmvp_SOURCE_DIR}/src ${libmvp_BINA
 #message("libmvp_SOURCE_DIR: ${libmvp_SOURCE_DIR}")
 #message("libmvp_BINARY_DIR: ${libmvp_BINARY_DIR}")
 
-add_executable(libmvp_testrunner EXCLUDE_FROM_ALL
+add_executable(libmvp_testrunner
   test_file_dialog.cc
   test_firmware.cc
   test_firmware_ops.cc
