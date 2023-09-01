@@ -3,6 +3,7 @@
 
 #include <gsl/gsl-lite.hpp>
 #include <QDebug>
+#include <gsl/gsl-lite.hpp>
 #include <QMap>
 #include <QObject>
 #include <QString>
