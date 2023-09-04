@@ -8,7 +8,7 @@ namespace mesytec
 namespace mvp
 {
 
-class Flash;
+class FlashInterface;
 
 class FirmwareWriter: public QObject
 {
@@ -18,7 +18,7 @@ class FirmwareWriter: public QObject
 
   public:
     FirmwareWriter(const FirmwareArchive &firmware,
-        Flash *flash,
+        FlashInterface *flash,
         QObject *parent = nullptr);
 
     void write();
@@ -37,7 +37,7 @@ class FirmwareWriter: public QObject
         const boost::optional<uchar> &area = boost::none);
 
     FirmwareArchive m_firmware;
-    Flash *m_flash = nullptr;
+    FlashInterface *m_flash = nullptr;
 
     bool m_do_erase = true;
     bool m_do_program = true;
@@ -97,7 +97,7 @@ class KeysHandler: public QObject
   public:
     KeysHandler(
         const FirmwareArchive &firmware,
-        gsl::not_null<Flash *> flash,
+        gsl::not_null<FlashInterface *> flash,
         QObject *parent = nullptr);
 
     KeysInfo get_keys_info();
@@ -106,7 +106,7 @@ class KeysHandler: public QObject
 
   private:
     FirmwareArchive m_firmware;
-    Flash *m_flash = nullptr;
+    FlashInterface *m_flash = nullptr;
     bool m_keys_info_read = false;
     KeysInfo m_keys_info;
 };
