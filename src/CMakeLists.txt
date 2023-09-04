@@ -64,6 +64,14 @@ target_link_libraries(libmvp
     PUBLIC gsl::gsl-lite-v0
 )
 
+if (TARGET mesytec-mvlc)
+    target_sources(libmvp PRIVATE
+        mvlc_mvp_lib.cc
+        mvlc_mvp_flash.cc
+    )
+    target_link_libraries(libmvp PUBLIC mesytec-mvlc)
+endif()
+
 target_include_directories(libmvp
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
