@@ -1,4 +1,0 @@
-# BLT readout until BERR or number of transfers reached
-# Note: Deliberately using 'bltfifo' here instead of the MBLT variant to avoid
-# data corruption when using a fast VME controller to readout the MADC32.
-bltfifo a32 0x0000 65535

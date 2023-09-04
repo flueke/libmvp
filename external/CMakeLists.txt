@@ -1,59 +1,9 @@
-# PCG - random number generator
-add_library(pcg INTERFACE)
-target_include_directories(pcg INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/pcg-cpp-0.98/include)
+add_subdirectory(gsl-lite)
 
-# zstr - C++ ZLib wrapper
-add_library(zstr INTERFACE)
-target_include_directories(zstr INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/zstr/src)
-
-# jcon-cpp
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/jcon-cpp/src/jcon/)
-target_compile_options(jcon
-    PRIVATE $<${not-msvc}:-Wno-deprecated-declarations> # disable Qt deprecation warnings
-    )
-
-# nlohmann json.hpp
-add_library(nlohmann-json INTERFACE)
-target_include_directories(nlohmann-json INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/nlohmann-json)
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/nlohmann-json/nlohmann" DESTINATION include/mvme)
-
-# Mustache template library
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/Mustache/mustache.hpp" DESTINATION include/mvme/Mustache)
-
-# exprtk
-add_library(exprtk INTERFACE)
-target_include_directories(exprtk INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/exprtk)
-
-# cpp11-on-multicore
-add_library(cpp11-on-multicore INTERFACE)
-target_include_directories(cpp11-on-multicore INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/cpp11-on-multicore)
-
-# libmesytec-mvlc
-add_subdirectory(mesytec-mvlc)
-
-# install pybind11 to include/
-INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/pybind11 DESTINATION include)
-
-# googletest
-if (MVME_BUILD_TESTS)
-    if (NOT TARGET gtest)
-        add_subdirectory(googletest)
-    endif()
+if (NOT TARGET mesytec-mvlc)
+    message("-- libmvp: using bundled mesytec-mvlc")
+    add_subdirectory(mesytec-mvlc)
+else()
+    message("-- libmvp: using existing mesytec-mvlc target")
 endif()
-
-# qgv - qt graphviz library
-add_subdirectory(qgv)
-
-# nng - networking library
-find_package(nng QUIET)
-
-if(NOT nng)
-    message("-- Using nng from external/nng")
-    option(NNG_SETSTACKSIZE "Use rlimit for thread stack size" ON)
-    set(NNG_TESTS OFF)
-    set(NNG_ENABLE_NNGCAT OFF)
-    add_subdirectory(nng)
-endif()
-
-# libmvp - mesytec vme programmer library
-add_subdirectory(libmvp)
+# vim:tw=0

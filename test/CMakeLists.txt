@@ -1,88 +1,25 @@
-if (MVME_BUILD_TESTS)
-
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Test REQUIRED)
-find_package(Qt5Widgets REQUIRED)
+find_package(Qt5 COMPONENTS Test REQUIRED)
 
-include_directories(../src)
-include_directories("${CMAKE_BINARY_DIR}/src")
+# Ugly and should be fixed.
+include_directories(${Boost_INCLUDE_DIRS} ${libmvp_SOURCE_DIR}/src ${libmvp_BINARY_DIR}/src)
 
-function(add_mvme_test exe_name exe_sources)
-    add_executable(${exe_name} ${exe_sources})
-    target_link_libraries(${exe_name}
-        PRIVATE libmvme
-        PRIVATE Qt5::Gui
-        PRIVATE Qt5::Test
-        PRIVATE Qt5::Widgets
-        )
-    add_test(NAME ${exe_name} COMMAND $<TARGET_FILE:${exe_name}>)
-endfunction(add_mvme_test)
+#message("libmvp_SOURCE_DIR: ${libmvp_SOURCE_DIR}")
+#message("libmvp_BINARY_DIR: ${libmvp_BINARY_DIR}")
 
-# IMPORTANT: When creating a new test you do need to create a new header file
-# for that test too. Using a combined header file for all test classes does
-# not work as automoc/cmake/something else fails to generate any actual MOC
-# code and we end up with undefined references to the vtable.
+add_executable(libmvp_testrunner
+  test_file_dialog.cc
+  test_firmware.cc
+  test_firmware_ops.cc
+  test_flash.cc
+  test_instruction_file.cc
+  test_instruction_interpreter.cc
+  testmain.cc
+  test_util.cc
+  tests.h # so MOC parses it, otherwise undefined references appear
+)
 
-add_mvme_test(test_data_filter test_data_filter.cc)
-target_link_libraries(test_data_filter PRIVATE liba2_static)
-#add_mvme_test(test_analysis_aggregate_ops test_analysis_aggregate_ops.cc)
-add_mvme_test(test_leaky_bucket test_leaky_bucket.cc)
+target_compile_features(libmvp_testrunner PRIVATE cxx_std_17)
+target_link_libraries(libmvp_testrunner PUBLIC libmvp Qt5::Test)
 
-# google/benchmark based tests
-find_library(GOOGLE_BENCHMARK benchmark)
-find_path(GOOGLE_BENCHMARK_INCLUDE_DIR "benchmark/benchmark.h")
-include_directories(${GOOGLE_BENCHMARK_INCLUDE_DIR})
-find_package(Threads)
-
-function(add_mvme_bench exe_name exe_sources)
-    add_executable(${exe_name} ${exe_sources})
-    target_link_libraries(${exe_name}
-        PRIVATE libmvme
-        PRIVATE ${GOOGLE_BENCHMARK}
-        PRIVATE Threads::Threads)
-    if (WIN32)
-        target_link_libraries(${exe_name}
-            PRIVATE shlwapi.lib)
-    endif(WIN32)
-    add_test(NAME ${exe_name} COMMAND $<TARGET_FILE:${exe_name}>)
-endfunction(add_mvme_bench)
-
-#add_mvme_bench(test_util_tree test_util_tree.cc)
-add_mvme_bench(bench_data_filter bench_data_filter.cc)
-target_link_libraries(bench_data_filter PRIVATE liba2_static)
-add_mvme_bench(test_misc test_misc.cc)
-
-# gtest tests
-
-# For tests depending on libmvme_core
-function(add_mvme_core_gtest exe_name exe_source)
-    add_executable(${exe_name} ${exe_source})
-    target_link_libraries(${exe_name}
-        PRIVATE libmvme_core
-        PRIVATE gtest
-        PRIVATE gtest_main)
-    add_test(NAME ${exe_name} COMMAND $<TARGET_FILE:${exe_name}>)
-endfunction(add_mvme_core_gtest)
-
-# For tests depending on libmvme
-function(add_mvme_gtest exe_name exe_source)
-    add_executable(${exe_name} ${exe_source})
-    target_link_libraries(${exe_name}
-        PRIVATE libmvme
-        PRIVATE gtest
-        PRIVATE gtest_main)
-    add_test(NAME ${exe_name} COMMAND $<TARGET_FILE:${exe_name}>)
-endfunction(add_mvme_gtest)
-
-add_mvme_core_gtest(test_util_databuffer "test_util_databuffer.cc")
-add_mvme_core_gtest(test_util_ticketmutex "test_util_ticketmutex.cc")
-add_mvme_core_gtest(test_vme_script_parsing "test_vme_script_parsing.cc")
-add_mvme_core_gtest(test_vme_script_variables "test_vme_script_variables.cc")
-add_mvme_core_gtest(test_vme_script_commands "test_vme_script_commands.cc")
-add_mvme_gtest(test_logfile_helper "logfile_helper.test.cc")
-add_mvme_gtest(test_multi_event_splitter "multi_event_splitter.test.cc")
-add_mvme_gtest(test_analysis_v3_to_v4_migration "analysis_v3_to_v4_migration.test.cc")
-
-endif(MVME_BUILD_TESTS)
+# vim:tw=0

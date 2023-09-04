@@ -1,13 +1,4 @@
+**/*.pyc
 **/*.swp
 **/*.swo
-CMakeLists.txt.user*
-extras/mvme-listfile-dumper/mvme-listfile-dumper
-compile_commands.json
-doc/doxygen/html/
-doc/mvme.qch
-doc/mvme.qhc
-doc/sphinx/source/changelog.rst
-.clangd/
-build*/
-.cmake/
-.cache/
+*.pro.user

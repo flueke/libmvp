@@ -1,346 +1,217 @@
-/* mvme - Mesytec VME Data Acquisition
- *
- * Copyright (C) 2016-2023 mesytec GmbH & Co. KG <info@mesytec.com>
- *
- * Author: Florian Lüke <f.lueke@mesytec.com>
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- */
-#ifndef __MVME_UTIL_H__
-#define __MVME_UTIL_H__
+#ifndef UUID_f77de5f7_899c_4f3e_925e_8818d474b790
+#define UUID_f77de5f7_899c_4f3e_925e_8818d474b790
 
-#include <QMetaType>
-#include <QPair>
-#include <QVariant>
-#include <QVector>
-#include <QWidget>
+#include <QException>
+#include <QFuture>
+#include <QtConcurrent>
+#include <QtDebug>
+#include <QSerialPort>
+#include <QTextStream>
+#include <QObject>
 
+#include <exception>
 #include <functional>
-#include <limits>
-#include <memory>
-#include <stdexcept>
+#include <system_error>
 
-#include "libmvme_core_export.h"
-#include "typedefs.h"
-#include "qt_util.h"
-#include "util/assert.h"
+#include <gsl/gsl-lite.hpp>
 
-#define ArrayCount(a) (sizeof(a) / sizeof((a)[0]))
+#define QSL(str) QStringLiteral(str)
 
-// Allows storing std::shared_ptr to QObject or derived inside QVariant.
-Q_DECLARE_SMART_POINTER_METATYPE(std::shared_ptr);
+class QThread;
 
-class QTextStream;
-
-LIBMVME_CORE_EXPORT void qDebugOutputBuffer(u8 *dataBuffer, size_t bufferSize);
-LIBMVME_CORE_EXPORT QTextStream &debugOutputBuffer(QTextStream &out, u8 *dataBuffer, size_t bufferSize);
-
-LIBMVME_CORE_EXPORT QVector<u32> parseStackFile(QTextStream &input);
-LIBMVME_CORE_EXPORT QVector<u32> parseStackFile(const QString &input);
-
-typedef QPair<u32, QVariant> RegisterSetting; // (addr, value)
-typedef QVector<RegisterSetting> RegisterList;
-
-LIBMVME_CORE_EXPORT RegisterList parseRegisterList(QTextStream &input, u32 baseAddress = 0);
-LIBMVME_CORE_EXPORT RegisterList parseRegisterList(const QString &input, u32 baseAddress = 0);
-
-inline bool isFloat(const QVariant &var)
+namespace mesytec
 {
-    return (static_cast<QMetaType::Type>(var.type()) == QMetaType::Float);
-}
-
-LIBMVME_CORE_EXPORT QString toString(const RegisterList &registerList);
-LIBMVME_CORE_EXPORT QStringList toStringList(const RegisterList &registerList);
-
-class LIBMVME_CORE_EXPORT end_of_buffer: public std::runtime_error
+namespace mvp
 {
-    public:
-        explicit end_of_buffer(const char *arg): std::runtime_error(arg) {}
-        end_of_buffer(): std::runtime_error("end_of_buffer") {}
+
+/* On construction moves the given object to the given target thread. On
+ * desctruction the object is moved back to its original thread. */
+class ThreadMover
+{
+  public:
+    ThreadMover(gsl::not_null<QObject *> object, QThread *target_thread)
+      : m_object(object)
+      , m_thread(object->thread())
+    {
+      qDebug() << this << "moving" << object.get() << "to target thread" << target_thread;
+
+      m_object->moveToThread(target_thread);
+
+      if (m_object->thread() != target_thread)
+        throw std::runtime_error("initial thread move failed");
+    }
+
+    ~ThreadMover()
+    {
+      qDebug() << this << "moving" << m_object << "to original thread" << m_thread;
+      m_object->moveToThread(m_thread);
+    }
+
+  private:
+      Q_DISABLE_COPY(ThreadMover);
+      QObject *m_object = 0;
+      QThread *m_thread = 0;
 };
 
-struct LIBMVME_CORE_EXPORT BufferIterator
+class QtExceptionPtr: public QException
 {
-    enum Alignment { Align16, Align32 };
-
-    u8 *data = nullptr;
-    u8 *buffp = nullptr;
-    u8 *endp = nullptr;
-    size_t size = 0;
-    Alignment alignment = Align32;
-
-
-    BufferIterator()
+  public:
+    explicit QtExceptionPtr(const std::exception_ptr &ptr)
+      : m_ptr(ptr)
     {}
 
-    BufferIterator(u8 *data, size_t size, Alignment alignment = Align32)
-        : data(data)
-        , buffp(data)
-        , endp(data + size)
-        , size(size)
-        , alignment(alignment)
-    {}
+    std::exception_ptr get() const { return m_ptr; }
+    void raise() const override { std::rethrow_exception(m_ptr); }
+    QtExceptionPtr *clone() const override { return new QtExceptionPtr(*this); }
 
-    BufferIterator(u32 *d, size_t sz)
-        : data(reinterpret_cast<u8 *>(d))
-        , buffp(data)
-        , endp(data + sz * sizeof(u32))
-        , size(sz * sizeof(u32))
-        , alignment(Align32)
-    {}
-
-    inline bool align32() const { return alignment == Align32; }
-
-    inline u8 extractU8()
-    {
-        if (buffp + sizeof(u8) > endp)
-            throw end_of_buffer();
-
-        u8 ret = *buffp;
-        buffp += sizeof(u8);
-        return ret;
-    }
-
-    inline u16 extractU16()
-    {
-        if (buffp + sizeof(u16) > endp)
-            throw end_of_buffer();
-
-        u32 ret = *reinterpret_cast<u16 *>(buffp);
-        buffp += sizeof(u16);
-        return ret;
-    }
-
-    inline u32 extractU32()
-    {
-        if (buffp + sizeof(u32) > endp)
-            throw end_of_buffer();
-
-        u32 ret = *reinterpret_cast<u32 *>(buffp);
-        buffp += sizeof(u32);
-        return ret;
-    }
-
-    inline u32 extractWord()
-    {
-        return align32() ? extractU32() : extractU16();
-    }
-
-    inline u8 extractByte()
-    {
-        return extractU8();
-    }
-
-    inline u16 extractShortword()
-    {
-        return extractU16();
-    }
-
-    inline u32 extractLongword()
-    {
-        return extractU32();
-    }
-
-    inline u16 peekU16() const
-    {
-        if (buffp + sizeof(u16) > endp)
-            throw end_of_buffer();
-
-        u32 ret = *reinterpret_cast<u16 *>(buffp);
-        return ret;
-    }
-
-    inline u32 peekU32(size_t index = 0) const
-    {
-        if (buffp + sizeof(u32) * index > endp)
-            throw end_of_buffer();
-
-        u32 ret = *(reinterpret_cast<u32 *>(buffp) + index);
-        return ret;
-    }
-
-    inline u32 peekWord() const
-    {
-        return align32() ? peekU32() : peekU16();
-    }
-
-    // Pushes a value onto the back of the buffer. Returns a pointer to the
-    // newly pushed value.
-    // Note: this does not take the alignment flag into account.
-    template <typename T>
-    inline T *push(T value)
-    {
-        static_assert(std::is_trivial<T>::value, "push<T>() works for trivial types only");
-
-        if (buffp + sizeof(T) > endp)
-            throw end_of_buffer();
-
-        T *ret = reinterpret_cast<T *>(buffp);
-        buffp += sizeof(T);
-        *ret = value;
-        return ret;
-    }
-
-    inline u32 bytesLeft() const
-    {
-        return endp - buffp;
-    }
-
-    inline u32 wordsLeft() const
-    {
-        return bytesLeft() / (align32() ? sizeof(u32) : sizeof(u16));
-    }
-
-    inline u32 shortwordsLeft() const
-    {
-        return bytesLeft() / sizeof(u16);
-    }
-
-    inline u32 longwordsLeft() const
-    {
-        return bytesLeft() / sizeof(u32);
-    }
-
-    inline u8  *asU8()  { return reinterpret_cast<u8 *>(buffp); }
-    inline u16 *asU16() { return reinterpret_cast<u16 *>(buffp); }
-    inline u32 *asU32() { return reinterpret_cast<u32 *>(buffp); }
-
-    inline u32 *indexU32(size_t index)
-    {
-        if (buffp + index * sizeof(u32) > endp)
-            throw end_of_buffer();
-
-        return reinterpret_cast<u32 *>(buffp) + index;
-    }
-
-    // Skips forward. Truncates to the buffer end if skipping would result in a
-    // position behind the buffer end.
-    inline void skip(size_t bytes)
-    {
-        buffp += bytes;
-        if (buffp > endp)
-            buffp = endp;
-    }
-
-    inline void skip(size_t width, size_t count)
-    {
-        skip(width * count);
-    }
-
-    // Skips forward. Throws end_of_buffer if skipping would exceed the end of
-    // buffer.
-    inline void skipExact(size_t bytes)
-    {
-        if (buffp + bytes > endp)
-            throw end_of_buffer();
-
-        buffp += bytes;
-    }
-
-    inline void skipExact(size_t width, size_t count)
-    {
-        skipExact(width * count);
-    }
-
-    inline bool atEnd() const { return buffp == endp; }
-
-    inline void rewind() { buffp = data; }
-    inline bool isEmpty() const { return size == 0; }
-    inline bool isNull() const { return !data; }
-    inline size_t used() const { return buffp - data; }
-
-    inline ptrdiff_t current32BitOffset() const
-    {
-        return reinterpret_cast<u32 *>(buffp) - reinterpret_cast<u32 *>(data);
-    }
+  private:
+    std::exception_ptr m_ptr;
 };
 
-LIBMVME_CORE_EXPORT QString readStringFile(const QString &filename);
-
-template<typename T>
-T *Var2Ptr(const QVariant &variant)
+// Note: requires specifying the return type T at the point of use
+template <typename T, typename Func>
+QFuture<T> run_in_thread(Func func, QObject *thread_dependent_obj)
 {
-    return static_cast<T *>(variant.value<void *>());
+  return QtConcurrent::run([=] {
+      try {
+        ThreadMover tm(thread_dependent_obj, QThread::currentThread());
+        qDebug() << "run_in_thread: calling functor";
+        return func();
+      } catch (...) {
+        qDebug() << "run_in_thread: exception caught";
+        throw QtExceptionPtr(std::current_exception());
+      }
+    });
 }
 
-template<typename T>
-T *Var2QObject(const QVariant &variant)
+template <typename T, typename Func>
+T run_in_thread_wait_in_loop(Func func, QObject *thread_dependent_obj,
+    QFutureWatcher<void> &fw)
 {
-    return qobject_cast<T *>(Var2Ptr<QObject>(variant));
+  QEventLoop loop;
+
+  auto con = QObject::connect(&fw, &QFutureWatcher<void>::finished, [&]() {
+      qDebug() << "exiting local event loop";
+      loop.quit();
+    });
+
+  ThreadMover tm(thread_dependent_obj, 0);
+
+  auto f = run_in_thread<T>(func, thread_dependent_obj);
+  fw.setFuture(f);
+
+  loop.exec();
+
+  QObject::disconnect(con);
+
+  return f.result();
 }
 
-template<typename T>
-QVariant Ptr2Var(T *ptr)
+template <typename Func>
+void run_in_thread_wait_in_loop(Func func, QObject *thread_dependent_obj,
+    QFutureWatcher<void> &fw)
 {
-    return QVariant::fromValue(static_cast<void *>(ptr));
+  QEventLoop loop;
+
+  auto con = QObject::connect(&fw, &QFutureWatcher<void>::finished, [&]() {
+      qDebug() << "exiting local event loop";
+      loop.quit();
+    });
+
+  ThreadMover tm(thread_dependent_obj, 0);
+
+  auto f = run_in_thread<void>(func, thread_dependent_obj);
+  fw.setFuture(f);
+
+  loop.exec();
+
+  QObject::disconnect(con);
+
+  f.waitForFinished();
 }
 
-LIBMVME_CORE_EXPORT QString makeDurationString(qint64 durationSeconds);
-
-/** Emits aboutToClose() before returning from closeEvent() */
-class LIBMVME_CORE_EXPORT MVMEWidget: public QWidget
-{
-    Q_OBJECT
-    signals:
-        void aboutToClose();
-
-    public:
-        explicit MVMEWidget(QWidget *parent = 0);
-
-    protected:
-        void closeEvent(QCloseEvent *event) override;
+const QMap<QSerialPort::SerialPortError, QString> port_error_to_string_data = {
+  { QSerialPort::NoError                    ,"NoError"              },
+  { QSerialPort::DeviceNotFoundError        ,"DeviceNotFoundError"  },
+  { QSerialPort::PermissionError            ,"PermissionError"      },
+  { QSerialPort::OpenError                  ,"OpenError"            },
+  { QSerialPort::NotOpenError               ,"NotOpenError"         },
+  { QSerialPort::ParityError                ,"ParityError"          },
+  { QSerialPort::FramingError               ,"FramingError"         },
+  { QSerialPort::BreakConditionError        ,"BreakConditionError"  },
+  { QSerialPort::WriteError                 ,"WriteError"           },
+  { QSerialPort::ReadError                  ,"ReadError"            },
+  { QSerialPort::ResourceError              ,"ResourceError"        },
+  { QSerialPort::UnsupportedOperationError  ,"UnsupportedOperationError" },
+  { QSerialPort::TimeoutError               ,"TimeoutError"         },
+  { QSerialPort::UnknownError               ,"UnknownError"         }
 };
 
-class LIBMVME_CORE_EXPORT TemplateLoader: public QObject
+inline QString port_error_to_string(const QSerialPort::SerialPortError &e)
 {
-    Q_OBJECT
-    signals:
-        void logMessage(const QString &msg);
-
-    public:
-        QString getTemplatePath();
-        QString readTemplate(const QString &name);
-
-    private:
-        QString m_templatePath;
-};
-
-LIBMVME_CORE_EXPORT QJsonDocument gui_read_json(QIODevice *input);
-LIBMVME_CORE_EXPORT QJsonDocument gui_read_json_file(const QString &fileName);
-
-// Writes the JSON data to the output file. Error reporting is done using
-// QMessageBoxes.
-LIBMVME_CORE_EXPORT bool gui_write_json_file(const QString &fileName, const QJsonDocument &doc);
-
-LIBMVME_CORE_EXPORT QPair<double, QString> byte_unit(size_t bytes);
-
-//QString format_memory_size(size_t bytes);
-
-LIBMVME_CORE_EXPORT void logBuffer(BufferIterator iter, std::function<void (const QString &)> loggerFun);
-LIBMVME_CORE_EXPORT void logBuffer(const QVector<u32> &data, std::function<void (const QString &)> loggerFun);
-
-static constexpr double make_quiet_nan()
-{
-    return std::numeric_limits<double>::quiet_NaN();
+  return port_error_to_string_data.value(e, QString::number(e));
 }
 
-inline constexpr size_t Kilobytes(size_t x) { return x * 1024; }
-inline constexpr size_t Megabytes(size_t x) { return Kilobytes(x) * 1024; }
-inline constexpr size_t Gigabytes(size_t x) { return Megabytes(x) * 1024; }
+class ComError: public std::runtime_error
+{
+  public:
+    ComError(const QString &msg, QSerialPort::SerialPortError ev=QSerialPort::NoError)
+      : std::runtime_error("Com Error")
+      , error_value(ev)
+    {
+      message = QString("Com Error: %1 (%2)")
+          .arg(msg)
+          .arg(port_error_to_string(ev))
+          .toLatin1();
+    }
 
-#define InvalidCodePath Q_ASSERT(!"invalid code path")
-#define InvalidDefaultCase default: { Q_ASSERT(!"invalid default case"); }
+    virtual const char * what() const noexcept override
+    { return message.constData(); }
 
-#endif // __MVME_UTIL_H_
+  QSerialPort::SerialPortError error_value;
+  QByteArray message;
+};
+
+ComError make_com_error(
+    gsl::not_null<QIODevice *> device,
+    bool clear_serial_port_error=true);
+
+template <typename T>
+QVector<T> span_to_qvector(const gsl::span<T> &span_)
+{
+  QVector<T> ret;
+  std::copy(span_.begin(), span_.end(), std::back_inserter(ret));
+  return ret;
+}
+
+} // ns mvp
+} // ns mesytec
+
+template <typename U>
+QString format_bytes(const U &bytes)
+{
+  QString ret;
+  QTextStream stream(&ret);
+  format_bytes(stream, bytes);
+  return ret;
+}
+
+template <typename T, typename U>
+T &format_bytes(T &stream, const U &bytes)
+{
+  stream << qSetFieldWidth(2) << qSetPadChar('0') << Qt::hex;
+
+  size_t i=0;
+
+  for (uchar c: bytes) {
+    stream << qSetFieldWidth(2) << qSetPadChar('0') << Qt::hex;
+    stream << c;
+    stream << Qt::reset << " ";
+
+    if ((++i % 16) == 0)
+      stream << Qt::endl;
+  }
+  return stream;
+}
+
+#endif
