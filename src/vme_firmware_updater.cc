@@ -545,6 +545,54 @@ static const Command WriteFirmwareCommand
     .exec = write_firmware_command,
 };
 
+DEF_EXEC_FUNC(boot_module_command)
+{
+    (void) self; (void) argc; (void) argv;
+    spdlog::trace("entered boot_module_command()");
+
+    using namespace mesytec::mvme_mvlc::mvp;
+
+    u32 vmeAddress = 0;
+    unsigned area = 0;
+
+    auto parser = ctx.parser;
+    parser.add_params({"--vme-address", "--area"});
+    parser.parse(argv);
+    trace_log_parser_info(parser, "boot_module_command");
+
+    if (!parse_into(parser, "--vme-address", vmeAddress, convert_to_unsigned))
+        return 1;
+
+    if (!parse_into(parser, "--area", area, convert_to_unsigned))
+        return 1;
+
+    auto [mvlc, ec] = make_and_connect_default_mvlc(ctx.parser);
+
+    if (!mvlc || ec)
+        return 1;
+
+    try
+    {
+        MvlcMvpFlash flash(mvlc, vmeAddress);
+        flash.boot(area);
+        std::cout << fmt::format("Booted VME module 0x{:08x} into firmware area {}\n", vmeAddress, area);
+    } catch (const std::exception &e)
+    {
+        std::cerr << fmt::format("Error sending 'boot' command to VME address 0x{:08x}: {}\n", vmeAddress, e.what());
+        return 1;
+    }
+
+    return 0;
+}
+
+static const Command BootModuleCommand
+{
+    .name = "boot-module",
+    .help = unindent(R"~(
+)~"),
+    .exec = boot_module_command,
+};
+
 inline Command make_command(const std::string &name)
 {
     Command ret;
@@ -580,6 +628,7 @@ int main(int argc, char *argv[])
     ctx.commands.insert(ScanbusCommand);
     ctx.commands.insert(DumpMemoryCommand);
     ctx.commands.insert(WriteFirmwareCommand);
+    ctx.commands.insert(BootModuleCommand);
 
     {
         std::string cmdName;
