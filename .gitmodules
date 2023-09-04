@@ -1,0 +1,4 @@
+[submodule "mesytec-mvlc"]
+	path = external/mesytec-mvlc
+	url = ../mesytec-mvlc.git
+	branch = main
