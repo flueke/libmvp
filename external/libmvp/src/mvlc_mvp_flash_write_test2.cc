@@ -1,10 +1,10 @@
 #include <algorithm>
 #include <chrono>
 #include <mesytec-mvlc/mesytec-mvlc.h>
-#include "mvlc/mvlc_mvp_lib.h"
+#include "mvlc_mvp_lib.h"
 
 using namespace mesytec::mvlc;
-using namespace mesytec::mvme_mvlc;
+using namespace mesytec::mvp;
 
 static const std::vector<u8> make_erased_page()
 {
