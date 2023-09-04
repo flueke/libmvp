@@ -10,9 +10,6 @@
 namespace mesytec::mvp
 {
 
-namespace constants = mesytec::mvp::constants;
-using Address = mesytec::mvp::Address;
-
 class MvlcMvpFlash: public mesytec::mvp::FlashInterface
 {
     Q_OBJECT

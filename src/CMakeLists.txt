@@ -189,7 +189,6 @@ add_library(libmvme_mvlc STATIC
     mvlc/mvlc_util.cc
     mvlc/mvlc_vme_controller.cc
     mvlc/mvlc_vme_debug_widget.cc
-    mvlc/mvlc_mvp_lib.cc
     #mvlc/readout_parser_support.cc
     )
 
@@ -437,7 +436,6 @@ target_include_directories(libmvme
 target_sources(libmvme PRIVATE
     mvlc_daq.cc
     mvlc_listfile_worker.cc
-    mvlc/mvlc_mvp_flash.cc
     mvlc/mvlc_trigger_io.cc
     mvlc/mvlc_trigger_io_editor.cc
     mvlc/mvlc_trigger_io_editor_p.cc
@@ -668,54 +666,6 @@ if(MVME_BUILD_TESTS)
 endif(MVME_BUILD_TESTS)
 
 if (MVME_BUILD_DEV_TOOLS)
-    add_executable(mvlc-mvp-read-page mvlc/mvlc_mvp_read_page.cc)
-    target_link_libraries(mvlc-mvp-read-page
-        PRIVATE libmvme
-        PRIVATE mesytec-mvlc
-        PRIVATE BFG::Lyra
-        PRIVATE spdlog::spdlog)
-
-    add_executable(mvlc-mvp-write-page mvlc/mvlc_mvp_write_page.cc)
-    target_link_libraries(mvlc-mvp-write-page
-        PRIVATE libmvme
-        PRIVATE mesytec-mvlc
-        PRIVATE BFG::Lyra
-        PRIVATE spdlog::spdlog)
-
-    add_executable(mvlc-mvp-erase-section mvlc/mvlc_mvp_erase_section.cc)
-    target_link_libraries(mvlc-mvp-erase-section
-        PRIVATE libmvme
-        PRIVATE mesytec-mvlc
-        PRIVATE BFG::Lyra
-        PRIVATE spdlog::spdlog)
-
-    add_executable(mvlc-mvp-flash-write-test mvlc/mvlc_mvp_flash_write_test.cc)
-    target_link_libraries(mvlc-mvp-flash-write-test
-        PRIVATE libmvme
-        PRIVATE mesytec-mvlc
-        PRIVATE BFG::Lyra
-        PRIVATE spdlog::spdlog)
-
-    add_executable(mvlc-mvp-flash-write-test2 mvlc/mvlc_mvp_flash_write_test2.cc)
-    target_link_libraries(mvlc-mvp-flash-write-test2
-        PRIVATE libmvme
-        PRIVATE mesytec-mvlc
-        PRIVATE BFG::Lyra
-        PRIVATE spdlog::spdlog)
-
-    add_executable(mvlc-mvp-flash-check-test-pages mvlc/mvlc_mvp_flash_check_test_pages.cc)
-    target_link_libraries(mvlc-mvp-flash-check-test-pages
-        PRIVATE libmvme
-        PRIVATE mesytec-mvlc
-        PRIVATE BFG::Lyra
-        PRIVATE spdlog::spdlog)
-
-    add_executable(mvlc-mvp-erase-unprotect-23bytes mvlc/mvlc_mvp_erase_unprotect_23bytes.cc)
-    target_link_libraries(mvlc-mvp-erase-unprotect-23bytes
-        PRIVATE libmvme
-        PRIVATE mesytec-mvlc
-        PRIVATE BFG::Lyra
-        PRIVATE spdlog::spdlog)
 endif(MVME_BUILD_DEV_TOOLS)
 
 # vim:tw=0

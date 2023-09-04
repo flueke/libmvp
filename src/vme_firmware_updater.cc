@@ -1,10 +1,10 @@
 #include <filesystem>
 #include <mesytec-mvlc/scanbus_support.h>
-#include "mvlc/mvlc_mvp_lib.h"
-#include "mvlc/mvlc_mvp_flash.h"
+#include <mvlc_mvp_lib.h>
+#include <mvlc_mvp_flash.h>
 
-using namespace mesytec::mvme_mvlc;
-using namespace mesytec::mvme_mvlc::mvp;
+using namespace mesytec::mvlc;
+using namespace mesytec::mvp;
 
 // https://stackoverflow.com/a/24900770
 inline std::string unindent(const char* p)
@@ -441,7 +441,7 @@ DEF_EXEC_FUNC(write_firmware_command)
     (void) self; (void) argc; (void) argv;
     spdlog::trace("entered write_firmware_command()");
 
-    using namespace mesytec::mvme_mvlc::mvp;
+    using namespace mesytec::mvp;
 
     u32 vmeAddress = 0;
     unsigned area = 0;
@@ -550,7 +550,7 @@ DEF_EXEC_FUNC(boot_module_command)
     (void) self; (void) argc; (void) argv;
     spdlog::trace("entered boot_module_command()");
 
-    using namespace mesytec::mvme_mvlc::mvp;
+    using namespace mesytec::mvp;
 
     u32 vmeAddress = 0;
     unsigned area = 0;
