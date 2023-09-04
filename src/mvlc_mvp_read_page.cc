@@ -1,9 +1,9 @@
 #include <chrono>
 #include <mesytec-mvlc/mesytec-mvlc.h>
-#include "mvlc/mvlc_mvp_lib.h"
+#include "mvlc_mvp_lib.h"
 
 using namespace mesytec::mvlc;
-using namespace mesytec::mvme_mvlc;
+using namespace mesytec::mvp;
 
 int main(int argc, char *argv[])
 {
