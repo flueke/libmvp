@@ -83,57 +83,56 @@ generate_export_header(libmvp)
 
 install(TARGETS libmvp DESTINATION lib)
 
-option(LIBMVP_BUILD_DEV_TOOLS "Build mvme dev tools" OFF)
+option(LIBMVP_BUILD_DEV_TOOLS "Build mvme dev tools" ON)
 
 if (LIBMVP_BUILD_DEV_TOOLS)
     add_executable(mvlc-mvp-read-page mvlc_mvp_read_page.cc)
     target_link_libraries(mvlc-mvp-read-page
         PRIVATE libmvp
-        PRIVATE mesytec-mvlc
         PRIVATE BFG::Lyra
         PRIVATE spdlog::spdlog)
 
     add_executable(mvlc-mvp-write-page mvlc_mvp_write_page.cc)
     target_link_libraries(mvlc-mvp-write-page
         PRIVATE libmvp
-        PRIVATE mesytec-mvlc
         PRIVATE BFG::Lyra
         PRIVATE spdlog::spdlog)
 
     add_executable(mvlc-mvp-erase-section mvlc_mvp_erase_section.cc)
     target_link_libraries(mvlc-mvp-erase-section
         PRIVATE libmvp
-        PRIVATE mesytec-mvlc
         PRIVATE BFG::Lyra
         PRIVATE spdlog::spdlog)
 
     add_executable(mvlc-mvp-flash-write-test mvlc_mvp_flash_write_test.cc)
     target_link_libraries(mvlc-mvp-flash-write-test
         PRIVATE libmvp
-        PRIVATE mesytec-mvlc
         PRIVATE BFG::Lyra
         PRIVATE spdlog::spdlog)
 
     add_executable(mvlc-mvp-flash-write-test2 mvlc_mvp_flash_write_test2.cc)
     target_link_libraries(mvlc-mvp-flash-write-test2
         PRIVATE libmvp
-        PRIVATE mesytec-mvlc
         PRIVATE BFG::Lyra
         PRIVATE spdlog::spdlog)
 
     add_executable(mvlc-mvp-flash-check-test-pages mvlc_mvp_flash_check_test_pages.cc)
     target_link_libraries(mvlc-mvp-flash-check-test-pages
         PRIVATE libmvp
-        PRIVATE mesytec-mvlc
         PRIVATE BFG::Lyra
         PRIVATE spdlog::spdlog)
 
     add_executable(mvlc-mvp-erase-unprotect-23bytes mvlc_mvp_erase_unprotect_23bytes.cc)
     target_link_libraries(mvlc-mvp-erase-unprotect-23bytes
         PRIVATE libmvp
-        PRIVATE mesytec-mvlc
         PRIVATE BFG::Lyra
         PRIVATE spdlog::spdlog)
+
+    # flashing mdpp/vmmr/mvlc modules through vme
+    add_executable(vme_firmware_updater vme_firmware_updater.cc)
+    target_link_libraries(vme_firmware_updater PRIVATE libmvp argh)
+    install(TARGETS vme_firmware_updater RUNTIME DESTINATION bin LIBRARY DESTINATION lib)
+
 endif(LIBMVP_BUILD_DEV_TOOLS)
 
 # vim:tw=0
