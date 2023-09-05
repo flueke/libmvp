@@ -26,6 +26,8 @@ class MvlcMvpFlash: public mesytec::mvp::FlashInterface
             , vmeAddress_(vmeAddress)
         {}
 
+        ~MvlcMvpFlash() override;
+
         void setMvlc(mvlc::MVLC &mvlc);
         mvlc::MVLC getMvlc() const;
         void setVmeAddress(mvlc::u32 vmeAddress);

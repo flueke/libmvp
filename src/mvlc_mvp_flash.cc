@@ -7,6 +7,12 @@ using namespace mesytec::mvp;
 namespace mesytec::mvp
 {
 
+MvlcMvpFlash::~MvlcMvpFlash()
+{
+    if (isFlashEnabled_)
+        disable_flash_interface(mvlc_, vmeAddress_);
+}
+
 void MvlcMvpFlash::setMvlc(MVLC &mvlc)
 {
     mvlc_ = mvlc;
@@ -76,7 +82,7 @@ void MvlcMvpFlash::write_page(const Address &address, uchar section, const gsl::
     std::vector<u8> pageBuffer;
     pageBuffer.reserve(data.size());
     std::copy(std::begin(data), std::end(data), std::back_inserter(pageBuffer));
-    if (auto ec = mesytec::mvp::write_page2(mvlc_, vmeAddress_, address.data() , section, pageBuffer))
+    if (auto ec = mesytec::mvp::write_page3(mvlc_, vmeAddress_, address.data() , section, pageBuffer))
         throw std::system_error(ec);
 
     emit data_written(span_to_qvector(data));
