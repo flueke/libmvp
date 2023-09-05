@@ -22,4 +22,6 @@ add_executable(libmvp_testrunner
 target_compile_features(libmvp_testrunner PRIVATE cxx_std_17)
 target_link_libraries(libmvp_testrunner PUBLIC libmvp Qt5::Test)
 
+add_test(NAME libmvp-test COMMAND libmvp_testrunner)
+
 # vim:tw=0
