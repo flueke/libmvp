@@ -1,45 +1,11 @@
 #include <filesystem>
 #include <mesytec-mvlc/scanbus_support.h>
+#include <mesytec-mvlc/util/string_util.h>
 #include <mvlc_mvp_lib.h>
 #include <mvlc_mvp_flash.h>
 
 using namespace mesytec::mvlc;
 using namespace mesytec::mvp;
-
-// https://stackoverflow.com/a/24900770
-inline std::string unindent(const char* p)
-{
-    std::string result;
-    if (*p == '\n') ++p;
-    const char* p_leading = p;
-    while (std::isspace(*p) && *p != '\n')
-        ++p;
-    size_t leading_len = p - p_leading;
-    while (*p)
-    {
-        result += *p;
-        if (*p++ == '\n')
-        {
-            for (size_t i = 0; i < leading_len; ++i)
-                if (p[i] != p_leading[i])
-                    goto dont_skip_leading;
-            p += leading_len;
-        }
-      dont_skip_leading: ;
-    }
-    return result;
-}
-
-std::string str_tolower(std::string s)
-{
-    std::transform(s.begin(), s.end(), s.begin(),
-                // static_cast<int(*)(int)>(std::tolower)         // wrong
-                // [](int c){ return std::tolower(c); }           // wrong
-                // [](char c){ return std::tolower(c); }          // wrong
-                   [](unsigned char c){ return std::tolower(c); } // correct
-                  );
-    return s;
-}
 
 // Converter signature is 'T converter(const std::string &str)'
 
