@@ -102,8 +102,9 @@ std::error_code write_page2(
     const FlashAddress &addr, u8 section,
     const std::vector<u8> &pageBuffer);
 
-// Write a full page or less by uploading and executing command stacks using
-// all the available stack memory.
+// Write a full page or less by uploading all data into a single command stack
+// and executing that stack. The MirrorTransactionMaxWords limit does not apply
+// as the stack upload is split into multiple parts internally.
 std::error_code write_page3(
     MVLC &mvlc, u32 moduleBase,
     const FlashAddress &addr, u8 section,
