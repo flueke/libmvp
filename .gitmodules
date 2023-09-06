@@ -1,0 +1,3 @@
+[submodule "external/mesytec-mvlc"]
+	path = external/mesytec-mvlc
+	url = ../mesytec-mvlc.git
