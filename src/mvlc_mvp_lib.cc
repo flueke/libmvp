@@ -1,4 +1,5 @@
 #include "mvlc_mvp_lib.h"
+#include <flash_constants.h>
 #include <chrono>
 #include <stdexcept>
 
@@ -34,6 +35,8 @@ std::error_code clear_output_fifo(MVLC &mvlc, u32 moduleBase)
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
     logger->debug("Clearing output fifo on 0x{:08x}", moduleBase);
 
+    auto tStart = std::chrono::steady_clock::now();
+
     size_t cycles = 0;
     //std::vector<u32> readBuffer;
 
@@ -57,10 +60,12 @@ std::error_code clear_output_fifo(MVLC &mvlc, u32 moduleBase)
         logger->debug("  clear_output_fifo: 0x{:04x} = 0x{:08x}", OutputFifoRegister, fifoValue);
     }
 
-    logger->debug("clear_output_fifo returned after {} read cycles", cycles);
-
     //if (cycles > 1)
     //  log_buffer(std::cout, readBuffer, "clear_output_fifo read buffer");
+    auto tEnd = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart);
+    logger->debug("clear_output_fifo() returned after {} read cycles, took {} ms to clear the fifo",
+                  cycles, elapsed.count()/1000.0);
 
     return {};
 }
@@ -201,13 +206,13 @@ bool check_response(const std::vector<u8> &request,
 
     if (codeStart != 0xff)
     {
-        logger->warn("invalid response code start 0x{:02} (expected 0xff)", codeStart);
+        logger->warn("invalid response code start 0x{:02x} (expected 0xff)", codeStart);
         return false;
     }
 
     if (!(status & 0x01))
     {
-        logger->warn("instruction failed (status bit 0 not set): 0x{02x}", status);
+        logger->warn("instruction failed (status bit 0 not set): 0x{:02x}", status);
         return false;
     }
 
@@ -367,9 +372,9 @@ std::error_code write_page(
         return ec;
 
     auto tEnd = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart);
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart);
     logger->info("write_page(): took {} ms to write {} bytes of data",
-                 elapsed.count(), pageBuffer.size());
+                 elapsed.count()/1000.0, pageBuffer.size());
 
     return {};
 }
@@ -582,7 +587,7 @@ std::error_code write_page3(
     logger->trace("write_page3(): flash response from 0x{:08x}: size={}, data={:#02x}",
         moduleBase, flashResponse.size(), fmt::join(flashResponse, ", "));
     #else
-    // get rid of this, handle it above with read_response() and check_response()
+    // TODO: get rid of this, handle it above with read_response() and check_response()
     if (auto ec = clear_output_fifo(mvlc, moduleBase))
         return ec;
 
@@ -592,6 +597,198 @@ std::error_code write_page3(
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart);
     logger->info("write_page3(): took {} ms to write {} bytes of data",
                  elapsed.count(), pageBuffer.size());
+
+    return {};
+}
+
+std::error_code write_page4(
+    MVLC &mvlc, u32 moduleBase,
+    const FlashAddress &addr, u8 section,
+    const std::vector<u8> &pageBuffer)
+{
+    auto logger = mvlc::get_logger("mvlc_mvp_lib");
+
+    if (pageBuffer.empty())
+        throw std::invalid_argument("write_page4: empty data given");
+
+    if (pageBuffer.size() > PageSize)
+        throw std::invalid_argument("write_page4: data size > page size");
+
+    u8 lenByte = pageBuffer.size() == PageSize ? 0 : pageBuffer.size();
+
+    auto tStart = std::chrono::steady_clock::now();
+
+    #if 0
+    for (int i=0; i<10; ++i)
+    {
+        u32 statusValue = 0u;
+        if (auto ec = mvlc.vmeRead(moduleBase + StatusRegister, statusValue, vme_amods::A32, VMEDataWidth::D16))
+            return ec;
+        spdlog::warn("write_page4(): polled flash StatusRegister: {:#04x} (poll1)", statusValue);
+        if (statusValue != 0)
+            break;
+    }
+    #endif
+
+    static const std::vector<u8> EfwRequest = { mesytec::mvp::opcodes::EFW, 0xCD, 0xAB };
+    static const unsigned ExpectedFlashResponseSize = 5;
+    static const u32 StackReferenceMarker = 0x13370001u;
+    // Response structure: 0xF3 stack frame header, reference marker word, data
+    // words from vme reads.
+    static const unsigned ExpectedStackResponseSize = 2 + ExpectedFlashResponseSize;
+
+
+    StackCommandBuilder sb;
+    // Initial marker so that stackTransaction() has a reference word.
+    sb.addWriteMarker(StackReferenceMarker);
+
+    // EFW - enable flash write. This is written back to the output fifo by the
+    // flash interface.
+    for (auto op: EfwRequest)
+        sb.addVMEWrite(moduleBase + InputFifoRegister, op,  vme_amods::A32, VMEDataWidth::D16);
+
+    // WRF - write flash. This is not written back to the output fifo.
+    sb.addVMEWrite(moduleBase + InputFifoRegister, opcodes::WRF, vme_amods::A32, VMEDataWidth::D16);
+    sb.addVMEWrite(moduleBase + InputFifoRegister, addr[0],      vme_amods::A32, VMEDataWidth::D16);
+    sb.addVMEWrite(moduleBase + InputFifoRegister, addr[1],      vme_amods::A32, VMEDataWidth::D16);
+    sb.addVMEWrite(moduleBase + InputFifoRegister, addr[2],      vme_amods::A32, VMEDataWidth::D16);
+    sb.addVMEWrite(moduleBase + InputFifoRegister, section,      vme_amods::A32, VMEDataWidth::D16);
+    sb.addVMEWrite(moduleBase + InputFifoRegister, lenByte,      vme_amods::A32, VMEDataWidth::D16);
+
+    // Add the actual page data to the stack.
+    for (auto dataWord: pageBuffer)
+        sb.addVMEWrite(moduleBase + InputFifoRegister, dataWord, vme_amods::A32, VMEDataWidth::D16);
+
+    // Wait for a couple of cycles before continuing with the stack (max value
+    // is 24 bit). Without the wait the output fifo will be in an invalid state
+    // as the commands from the input fifo are still being processed by the
+    // flash interface.
+    sb.addWait(100000);
+
+    // Accu loop: read the statusregister until it's 0, meaning "flash output fifo not empty".
+    sb.addReadToAccu(moduleBase + StatusRegister, vme_amods::A32, VMEDataWidth::D16);
+    sb.addCompareLoopAccu(AccuComparator::EQ, 0);
+
+    // Now read the flash response from the flash output fifo.
+    for (unsigned i=0; i<ExpectedFlashResponseSize; ++i)
+        sb.addVMERead(moduleBase + OutputFifoRegister, vme_amods::A32, VMEDataWidth::D16);
+
+    logger->debug("write_page4(): performing stackTransaction: pageSize={} bytes, stackCommands={}"
+                  ", encodedStackSize={} words",
+                  pageBuffer.size(), sb.commandCount(), get_encoded_stack_size(sb));
+
+    std::vector<u32> stackResponse;
+
+    if (auto ec = mvlc.stackTransaction(sb, stackResponse))
+    {
+        logger->error("write_page4(): stackTransaction failed: {}", ec.message());
+        return ec;
+    }
+
+    logger->debug("write_page4(): response from stackTransaction: size={}, data={:#08x}",
+                    stackResponse.size(), fmt::join(stackResponse, ", "));
+
+    if (stackResponse.size() != ExpectedStackResponseSize)
+    {
+        logger->error("write_page4(): stack response too short! got {} words, expected {} words",
+            stackResponse.size(), ExpectedStackResponseSize);
+        return make_error_code(std::errc::protocol_error);
+    }
+
+    if (extract_frame_info(stackResponse[0]).flags & frame_flags::AllErrorFlags)
+    {
+        if (extract_frame_info(stackResponse[0]).flags & frame_flags::Timeout)
+            return MVLCErrorCode::NoVMEResponse;
+
+        if (extract_frame_info(stackResponse[0]).flags & frame_flags::SyntaxError)
+            return MVLCErrorCode::StackSyntaxError;
+
+        // Note: BusError can not happen as there's no block read in the stack
+    }
+
+    if (stackResponse[1] != StackReferenceMarker)
+    {
+        logger->error("write_page4(): stack response does not start with the reference marker");
+        return MVLCErrorCode::StackReferenceMismatch;
+    }
+
+    std::vector<u8> flashResponse;
+    std::copy(std::begin(stackResponse) + 2, std::end(stackResponse), std::back_inserter(flashResponse));
+
+    if (!check_response(EfwRequest, flashResponse))
+    {
+        logger->error("write_page4(): flash check_response() failed");
+        return make_error_code(std::errc::protocol_error);
+    }
+
+    //if (auto ec = clear_output_fifo(mvlc, moduleBase))
+    //    return ec;
+
+#if 0
+    //  Expect the 0xF3 stack frame and the marker word
+    if (stackResponse.size() != 2)
+        return make_error_code(MVLCErrorCode::UnexpectedResponseSize);
+
+    if (extract_frame_info(stackResponse[0]).flags & frame_flags::AllErrorFlags)
+    {
+        if (extract_frame_info(stackResponse[0]).flags & frame_flags::Timeout)
+            return MVLCErrorCode::NoVMEResponse;
+
+        if (extract_frame_info(stackResponse[0]).flags & frame_flags::SyntaxError)
+            return MVLCErrorCode::StackSyntaxError;
+
+        // Note: BusError can not happen as there's no block read in the stack
+    }
+
+    #if 0
+    std::vector<u8> flashResponse;
+    if (auto ec = read_response(mvlc, moduleBase, flashResponse))
+    {
+        logger->error("write_page4(): error reading flash response from 0x{:08x}: {}",
+            moduleBase, ec.message());
+        return ec;
+    }
+
+    logger->trace("write_page4(): flash response from 0x{:08x}: size={}, data={:#02x}",
+        moduleBase, flashResponse.size(), fmt::join(flashResponse, ", "));
+    #elif 0
+    // TODO: get rid of this, handle it above with read_response() and check_response()
+    if (auto ec = clear_output_fifo(mvlc, moduleBase))
+        return ec;
+
+    #else
+    // Manually read the StatusRegister to figure out how it works
+
+    for (int i=0; i<10; ++i)
+    {
+        u32 statusValue = 0u;
+        if (auto ec = mvlc.vmeRead(moduleBase + StatusRegister, statusValue, vme_amods::A32, VMEDataWidth::D16))
+            return ec;
+        spdlog::warn("write_page4(): polled flash StatusRegister: {:#04x} (poll2)", statusValue);
+        if (statusValue != 0)
+            break;
+    }
+
+    if (auto ec = clear_output_fifo(mvlc, moduleBase))
+        return ec;
+
+    for (int i=0; i<10; ++i)
+    {
+        u32 statusValue = 0u;
+        if (auto ec = mvlc.vmeRead(moduleBase + StatusRegister, statusValue, vme_amods::A32, VMEDataWidth::D16))
+            return ec;
+        spdlog::warn("write_page4(): polled flash StatusRegister: {:#04x} (poll3)", statusValue);
+        if (statusValue != 0)
+            break;
+    }
+
+    #endif
+#endif
+
+    auto tEnd = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart);
+    logger->info("write_page4(): took {} ms to write {} bytes of data",
+                 elapsed.count()/1000.0, pageBuffer.size());
 
     return {};
 }

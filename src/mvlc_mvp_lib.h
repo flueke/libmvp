@@ -36,6 +36,11 @@ namespace output_fifo_flags
 
 static const u8 FlashInstructionSuccess = 0x01;
 
+namespace status_register_flags
+{
+    static const u32 FlashOutputFifoEmpty = 1u << 0;
+};
+
 inline void log_page_buffer(const std::vector<u8> &page)
 {
     int col = 0;
@@ -106,6 +111,19 @@ std::error_code write_page2(
 // and executing that stack. The MirrorTransactionMaxWords limit does not apply
 // as the stack upload is split into multiple parts internally.
 std::error_code write_page3(
+    MVLC &mvlc, u32 moduleBase,
+    const FlashAddress &addr, u8 section,
+    const std::vector<u8> &pageBuffer);
+
+// Same as write_page3() but uses the stack accu to poll the flash status
+// register for '!flash_empty', meaning there is an answer from the flash
+// interface. After the accu loop the stack reads the expected number of
+// response words from the output fifo. This is the final stack response that
+// has to be parsed by software.
+// During development/debugging an additional check can be done:
+// clear_output_fifo() should return after one cycle if the stack words
+// correctly.
+std::error_code write_page4(
     MVLC &mvlc, u32 moduleBase,
     const FlashAddress &addr, u8 section,
     const std::vector<u8> &pageBuffer);
