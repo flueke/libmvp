@@ -42,6 +42,7 @@ add_library(libmvp
     file_dialog.cc
     firmware.cc
     firmware_ops.cc
+    firmware_selection_widget.cc
     flash_address.cc
     flash.cc
     flash_widget.cc
