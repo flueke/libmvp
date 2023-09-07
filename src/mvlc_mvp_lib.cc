@@ -721,69 +721,9 @@ std::error_code write_page4(
         return make_error_code(std::errc::protocol_error);
     }
 
+    // Use clear_output_fifo() to log the remaining data in case of issues.
     //if (auto ec = clear_output_fifo(mvlc, moduleBase))
     //    return ec;
-
-#if 0
-    //  Expect the 0xF3 stack frame and the marker word
-    if (stackResponse.size() != 2)
-        return make_error_code(MVLCErrorCode::UnexpectedResponseSize);
-
-    if (extract_frame_info(stackResponse[0]).flags & frame_flags::AllErrorFlags)
-    {
-        if (extract_frame_info(stackResponse[0]).flags & frame_flags::Timeout)
-            return MVLCErrorCode::NoVMEResponse;
-
-        if (extract_frame_info(stackResponse[0]).flags & frame_flags::SyntaxError)
-            return MVLCErrorCode::StackSyntaxError;
-
-        // Note: BusError can not happen as there's no block read in the stack
-    }
-
-    #if 0
-    std::vector<u8> flashResponse;
-    if (auto ec = read_response(mvlc, moduleBase, flashResponse))
-    {
-        logger->error("write_page4(): error reading flash response from 0x{:08x}: {}",
-            moduleBase, ec.message());
-        return ec;
-    }
-
-    logger->trace("write_page4(): flash response from 0x{:08x}: size={}, data={:#02x}",
-        moduleBase, flashResponse.size(), fmt::join(flashResponse, ", "));
-    #elif 0
-    // TODO: get rid of this, handle it above with read_response() and check_response()
-    if (auto ec = clear_output_fifo(mvlc, moduleBase))
-        return ec;
-
-    #else
-    // Manually read the StatusRegister to figure out how it works
-
-    for (int i=0; i<10; ++i)
-    {
-        u32 statusValue = 0u;
-        if (auto ec = mvlc.vmeRead(moduleBase + StatusRegister, statusValue, vme_amods::A32, VMEDataWidth::D16))
-            return ec;
-        spdlog::warn("write_page4(): polled flash StatusRegister: {:#04x} (poll2)", statusValue);
-        if (statusValue != 0)
-            break;
-    }
-
-    if (auto ec = clear_output_fifo(mvlc, moduleBase))
-        return ec;
-
-    for (int i=0; i<10; ++i)
-    {
-        u32 statusValue = 0u;
-        if (auto ec = mvlc.vmeRead(moduleBase + StatusRegister, statusValue, vme_amods::A32, VMEDataWidth::D16))
-            return ec;
-        spdlog::warn("write_page4(): polled flash StatusRegister: {:#04x} (poll3)", statusValue);
-        if (statusValue != 0)
-            break;
-    }
-
-    #endif
-#endif
 
     auto tEnd = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart);
