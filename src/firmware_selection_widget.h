@@ -18,6 +18,7 @@ class FirmwareSelectionWidget: public QWidget
         ~FirmwareSelectionWidget() override;
 
         QString get_firmware_file() const;
+        void set_firmware_file(const QString &filename);
         int get_area_index() const;
 
     private:
