@@ -49,6 +49,8 @@ add_library(libmvp
     instruction_file.cc
     instruction_interpreter.cc
     mdpp16.cc
+    mvlc_connect_widget.ui
+    mvlc_connect_widget.cc
     port_helper.cc
     util.cc
 )

@@ -1,6 +1,7 @@
 #ifndef SRC_FIRMWARE_SELECTION_WIDGET_H_
 #define SRC_FIRMWARE_SELECTION_WIDGET_H_
 
+#include <memory>
 #include <QWidget>
 
 namespace mesytec::mvp
