@@ -51,6 +51,8 @@ add_library(libmvp
     mdpp16.cc
     mvlc_connect_widget.ui
     mvlc_connect_widget.cc
+    mvp_advanced_widget.cc
+    mvp_advanced_widget.ui
     port_helper.cc
     util.cc
 )
