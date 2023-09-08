@@ -7,17 +7,20 @@
 namespace mesytec::mvp
 {
 
-std::vector<QVariantMap> get_eth_history()
+namespace
+{
+
+std::vector<QVariantMap> load_eth_history()
 {
     QSettings settings;
-    auto entries = settings.value("mvp/mvlc_eth_history").toStringList();
+    auto hosts = settings.value("mvp/mvlc_eth_history").toStringList();
     std::vector<QVariantMap> result;
-    std::transform(std::begin(entries), std::end(entries), std::back_inserter(result),
-        [] (const QString &entry)
+    std::transform(std::begin(hosts), std::end(hosts), std::back_inserter(result),
+        [] (const QString &host)
         {
             QVariantMap m;
             m["method"] = "eth";
-            m["address"] = entry;
+            m["address"] = host;
             return m;
         });
     return result;
@@ -25,6 +28,16 @@ std::vector<QVariantMap> get_eth_history()
 
 void store_eth_history(const std::vector<QVariantMap> &entries)
 {
+    QStringList hosts;
+
+    for (const auto &entry: entries)
+    {
+        if (entry["method"] == "eth")
+            hosts.push_back(entry["address"].toString());
+    }
+
+    QSettings settings;
+    settings.setValue("mvp/mvlc_eth_history", hosts);
 }
 
 std::vector<QVariantMap> get_usb_devices()
@@ -54,6 +67,8 @@ QString connect_info_title(const QVariantMap &info)
         return QStringLiteral("%1 - %2").arg(info["description"].toString()).arg(info["serial"].toString());
     return {};
 }
+
+} // end anon namespace
 
 struct MvlcConnectWidget::Private
 {
