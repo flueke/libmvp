@@ -54,6 +54,7 @@ add_library(libmvp
     mvp_advanced_widget.cc
     mvp_advanced_widget.ui
     port_helper.cc
+    serial_port_flash.cc
     util.cc
 )
 
