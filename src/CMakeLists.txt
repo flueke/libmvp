@@ -53,6 +53,7 @@ add_library(libmvp
     mvlc_connect_widget.cc
     mvp_advanced_widget.cc
     mvp_advanced_widget.ui
+    mvp_connector_interface.cc
     port_helper.cc
     serial_port_flash.cc
     util.cc
