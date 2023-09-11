@@ -37,8 +37,6 @@ message("-- Using QUAZIP_QT5=${QUAZIP_QT5}")
 include_directories(${Boost_INCLUDE_DIRS} ${QUAZIP_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(libmvp
-    flash_widget.ui
-    resources.qrc
     file_dialog.cc
     firmware.cc
     firmware_ops.cc
@@ -46,16 +44,21 @@ add_library(libmvp
     flash_address.cc
     flash.cc
     flash_widget.cc
+    flash_widget.ui
     instruction_file.cc
     instruction_interpreter.cc
     mdpp16.cc
-    mvlc_connect_widget.ui
     mvlc_connect_widget.cc
+    mvlc_connect_widget.ui
+    mvlc_mvp_connector.cc
     mvp_advanced_widget.cc
     mvp_advanced_widget.ui
     mvp_connector_interface.cc
     port_helper.cc
+    resources.qrc
+    serial_port_connect_widget.cc
     serial_port_flash.cc
+    serial_port_mvp_connector.cc
     util.cc
 )
 

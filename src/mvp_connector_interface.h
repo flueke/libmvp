@@ -10,7 +10,9 @@ namespace mesytec::mvp
 class MvpConnectorInterface: public QObject
 {
     Q_OBJECT
-        void connectorEnabledChanged();
+    signals:
+        void connectorEnabledChanged(bool enabled);
+        void logMessage(const QString &msg);
 
     public:
         MvpConnectorInterface(QObject *parent = nullptr)
@@ -18,11 +20,26 @@ class MvpConnectorInterface: public QObject
         {}
         virtual ~MvpConnectorInterface();
 
-        virtual FlashInterface *getFlash() = 0;
+        virtual void open() = 0;
+        virtual void close() = 0;
+        // Note: ownership of the flash
+        virtual FlashInterface *getFlash() = 0; // owned by MvpConnectorInterface as a QObject child
 
     public slots:
         virtual void setConnectInfo(const QVariantMap &info) = 0;
-        virtual void setConnectorEnabled(bool enabled) = 0;
+        virtual void setConnectorEnabled(bool enabled)
+        {
+            if (enabled != connectorEnabled_)
+            {
+                if (!enabled)
+                    close();
+                connectorEnabled_ = enabled;
+                emit connectorEnabledChanged(connectorEnabled_);
+            }
+        }
+
+    private:
+        bool connectorEnabled_ = true;
 };
 
 }

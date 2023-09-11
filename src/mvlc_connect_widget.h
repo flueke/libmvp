@@ -8,12 +8,21 @@
 namespace mesytec::mvp
 {
 
+// Note: connection info is stored in QVariantMaps. Structure of the map:
+//   method: "eth"|"usb"
+//   address: eth host/ip
+//   index: usb device index
+//   serial: usb device serial string
+//   description: usb device description
+//   vme_address: target vme address
+
 class MvlcConnectWidget: public QWidget
 {
     Q_OBJECT
     signals:
         void connectMvlc(const QVariantMap &info);
-        void disconnectMvlc();
+        void scanbus();
+        void logMessage(const QString &msg);
 
     public:
         MvlcConnectWidget(QWidget *parent = nullptr);
@@ -24,11 +33,14 @@ class MvlcConnectWidget: public QWidget
 
     public slots:
         void setConnectInfo(const QVariantMap &info);
+        void setScanbusResult(const QVariantMap &data);
 
     private:
         struct Private;
         std::unique_ptr<Private> d;
 };
+
+QString get_mvlc_connect_info_title(const QVariantMap &info);
 
 }
 

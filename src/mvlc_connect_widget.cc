@@ -40,7 +40,7 @@ void store_eth_history(const std::vector<QVariantMap> &entries)
     settings.setValue("mvp/mvlc_eth_history", hosts);
 }
 
-std::vector<QVariantMap> get_usb_devices()
+std::vector<QVariantMap> list_usb_devices()
 {
     auto devices = mesytec::mvlc::usb::get_device_info_list();
     std::vector<QVariantMap> result;
@@ -57,15 +57,6 @@ std::vector<QVariantMap> get_usb_devices()
         });
 
     return result;
-}
-
-QString connect_info_title(const QVariantMap &info)
-{
-    if (info["method"] == "eth")
-        return info["address"].toString();
-    else if (info["method"] == "usb")
-        return QStringLiteral("%1 - %2").arg(info["description"].toString()).arg(info["serial"].toString());
-    return {};
 }
 
 } // end anon namespace
@@ -111,6 +102,13 @@ MvlcConnectWidget::MvlcConnectWidget(QWidget *parent)
 {
     d->q = this;
     d->ui_.setupUi(this);
+    d->ui_.combo_vmeAddress->setCurrentText("0x00000000");
+    d->ui_.pb_scanbus->setEnabled(false); // TODO: implement scanbus functionality to locate target devices.
+
+    connect(d->ui_.pb_scanbus, &QPushButton::clicked,
+        this, [this]
+    {
+    });
 }
 
 MvlcConnectWidget::~MvlcConnectWidget()
@@ -131,7 +129,11 @@ void MvlcConnectWidget::setIsConnected(bool isConnected)
 QVariantMap MvlcConnectWidget::getConnectInfo()
 {
     if (auto combo = d->activeConnectCombo())
-        return combo->currentData().toMap();
+    {
+        auto result = combo->currentData().toMap();
+        result["vme_address"] = d->ui_.combo_vmeAddress->currentData();
+        return result;
+    }
     return {};
 }
 
@@ -143,6 +145,22 @@ void MvlcConnectWidget::setConnectInfo(const QVariantMap &info)
         if (idx >= 0)
             combo->setCurrentIndex(idx);
     }
+}
+
+void MvlcConnectWidget::setScanbusResult(const QVariantMap &data)
+{
+    // TODO: show a list of found vme devices.
+    // allow the user to double click a device to select
+    // on device selection update the vme target address box
+}
+
+QString get_mvlc_connect_info_title(const QVariantMap &info)
+{
+    if (info["method"] == "eth")
+        return info["address"].toString();
+    else if (info["method"] == "usb")
+        return QStringLiteral("%1 - %2").arg(info["description"].toString()).arg(info["serial"].toString());
+    return {};
 }
 
 }
