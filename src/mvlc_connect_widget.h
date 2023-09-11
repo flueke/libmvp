@@ -20,8 +20,8 @@ class MvlcConnectWidget: public QWidget
 {
     Q_OBJECT
     signals:
-        void connectMvlc(const QVariantMap &info);
-        void scanbus();
+        void mvlcChanged(const QVariantMap &mvlc);
+        void scanbusRequested();
         void logMessage(const QString &msg);
 
     public:

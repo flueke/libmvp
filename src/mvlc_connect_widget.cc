@@ -105,10 +105,7 @@ MvlcConnectWidget::MvlcConnectWidget(QWidget *parent)
     d->ui_.combo_vmeAddress->setCurrentText("0x00000000");
     d->ui_.pb_scanbus->setEnabled(false); // TODO: implement scanbus functionality to locate target devices.
 
-    connect(d->ui_.pb_scanbus, &QPushButton::clicked,
-        this, [this]
-    {
-    });
+    connect(d->ui_.pb_scanbus, &QPushButton::clicked, this, &MvlcConnectWidget::scanbusRequested);
 }
 
 MvlcConnectWidget::~MvlcConnectWidget()
@@ -144,6 +141,11 @@ void MvlcConnectWidget::setConnectInfo(const QVariantMap &info)
         auto idx = combo->findData(info);
         if (idx >= 0)
             combo->setCurrentIndex(idx);
+        else
+        {
+            combo->addItem(get_mvlc_connect_info_title(info), info);
+            combo->setCurrentIndex(combo->count() - 1);
+        }
     }
 }
 

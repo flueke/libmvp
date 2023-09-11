@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <QWidget>
+#include "port_helper.h"
 
 namespace mesytec::mvp
 {
@@ -12,6 +13,7 @@ class SerialPortConnectWidget: public QWidget
     Q_OBJECT
     signals:
         void serialPortRefreshRequested();
+        void serialPortChanged(const QString &portName);
 
     public:
         SerialPortConnectWidget(QWidget *parent = nullptr);
@@ -20,7 +22,8 @@ class SerialPortConnectWidget: public QWidget
         QString getSelectedPortName() const;
 
     public slots:
-        void setAvailablePorts(const QStringList &ports);
+        //void setAvailablePorts(const QStringList &ports);
+        void setAvailablePorts(const QList<QSerialPortInfo> &ports);
 
     private:
         struct Private;

@@ -13,7 +13,7 @@ struct SerialPortConnectWidget::Private
 {
     QComboBox *combo_ports_;
     QPushButton *pb_refresh_;
-    QStringList prevPorts_;
+    QList<QSerialPortInfo> prevPorts_;
 };
 
 SerialPortConnectWidget::SerialPortConnectWidget(QWidget *parent)
@@ -30,6 +30,15 @@ SerialPortConnectWidget::SerialPortConnectWidget(QWidget *parent)
 
     auto layout = new QFormLayout(this);
     layout->addRow("Serial Port", lineLayout);
+
+    connect(d->pb_refresh_, &QPushButton::clicked,
+        this, &SerialPortConnectWidget::serialPortRefreshRequested);
+
+    connect(d->combo_ports_, qOverload<int>(&QComboBox::currentIndexChanged),
+        this, [this] (int idx)
+        {
+            emit serialPortChanged(getSelectedPortName());
+        });
 }
 
 SerialPortConnectWidget::~SerialPortConnectWidget()
@@ -41,23 +50,19 @@ QString SerialPortConnectWidget::getSelectedPortName() const
     return d->combo_ports_->currentData().toString();
 }
 
-void SerialPortConnectWidget::setAvailablePorts(const QStringList &portNames)
+void SerialPortConnectWidget::setAvailablePorts(const QList<QSerialPortInfo> &portInfos)
 {
-    if (portNames == d->prevPorts_)
+    if (portInfos == d->prevPorts_)
         return;
-
-    std::vector<QSerialPortInfo> portInfos;
-
-    std::transform(std::begin(portNames), std::end(portNames), std::back_inserter(portInfos),
-        [] (const QString &portName) { return QSerialPortInfo(portName); });
 
     const auto currentPort = getSelectedPortName();
 
+    QSignalBlocker b(d->combo_ports_);
+
     d->combo_ports_->clear();
 
-    for (const auto &portName: portNames)
+    for (const auto &info: portInfos)
     {
-        QSerialPortInfo info(portName);
         if (!info.serialNumber().isEmpty())
         {
             QString s;
@@ -96,7 +101,8 @@ void SerialPortConnectWidget::setAvailablePorts(const QStringList &portNames)
     }
 
     d->combo_ports_->setCurrentIndex(idx);
-    d->prevPorts_ = portNames;
+    d->prevPorts_ = portInfos;
+    emit serialPortChanged(getSelectedPortName());
 }
 
 }
