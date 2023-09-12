@@ -55,6 +55,7 @@ FirmwareSelectionWidget::FirmwareSelectionWidget(QWidget *parent)
     stepsLayout->addStretch(1);
 
     d->pb_start_ = new QPushButton("Start");
+    d->pb_start_->setEnabled(false); // is enabled when a valid firmware file is selected
     auto startLayout = new QHBoxLayout;
     startLayout->addStretch(1);
     startLayout->addWidget(d->pb_start_);
@@ -96,6 +97,9 @@ FirmwareSelectionWidget::FirmwareSelectionWidget(QWidget *parent)
 
     connect(pb_open_file, &QPushButton::clicked,
         this, on_pb_open_file_clicked);
+
+    connect(d->pb_start_, &QPushButton::clicked,
+        this, &FirmwareSelectionWidget::start_button_clicked);
 }
 
 FirmwareSelectionWidget::~FirmwareSelectionWidget()
@@ -129,4 +133,15 @@ FirmwareSteps FirmwareSelectionWidget::get_firmware_steps() const
         result |= FirmwareSteps::Step_Verify;
     return result;
 }
+
+void FirmwareSelectionWidget::set_area_select_enabled(bool enabled)
+{
+    d->combo_area_->setEnabled(enabled);
+}
+
+void FirmwareSelectionWidget::set_start_button_enabled(bool enabled)
+{
+    d->pb_start_->setEnabled(enabled);
+}
+
 }

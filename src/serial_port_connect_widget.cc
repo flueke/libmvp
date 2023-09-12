@@ -21,6 +21,7 @@ SerialPortConnectWidget::SerialPortConnectWidget(QWidget *parent)
     , d(std::make_unique<Private>())
 {
     d->combo_ports_ = new QComboBox;
+    d->combo_ports_->setMinimumWidth(150);
     d->pb_refresh_ = new QPushButton;
     d->pb_refresh_->setIcon(QIcon(":/connecting.png"));
     auto lineLayout = new QHBoxLayout;

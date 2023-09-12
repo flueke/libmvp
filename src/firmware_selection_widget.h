@@ -44,6 +44,10 @@ class FirmwareSelectionWidget: public QWidget
 
         FirmwareSteps get_firmware_steps() const;
 
+    public slots:
+        void set_area_select_enabled(bool enabled);
+        void set_start_button_enabled(bool enabled);
+
     private:
         struct Private;
         std::unique_ptr<Private> d;

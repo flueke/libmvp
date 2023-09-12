@@ -17,7 +17,7 @@
    <item>
     <widget class="QTabWidget" name="tabs_connectMethod">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tab_usb">
       <attribute name="title">
@@ -47,7 +47,7 @@
         <widget class="QComboBox" name="combo_usb">
          <property name="minimumSize">
           <size>
-           <width>150</width>
+           <width>225</width>
            <height>0</height>
           </size>
          </property>
@@ -79,7 +79,7 @@
        <item>
         <widget class="QPushButton" name="pb_connect_usb">
          <property name="enabled">
-          <bool>false</bool>
+          <bool>true</bool>
          </property>
          <property name="text">
           <string>Connect</string>
@@ -128,7 +128,7 @@
        <item>
         <widget class="QPushButton" name="pb_connect_eth">
          <property name="enabled">
-          <bool>false</bool>
+          <bool>true</bool>
          </property>
          <property name="text">
           <string>Connect</string>

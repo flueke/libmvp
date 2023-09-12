@@ -233,6 +233,7 @@ void FlashInterface::enable_write()
 
 void FlashInterface::erase_section(uchar index)
 {
+  emit progress_range_changed(0, 0);
   maybe_enable_write();
   m_wbuf = { opcodes::ERF, 0, 0, 0, index };
   write_instruction(m_wbuf);

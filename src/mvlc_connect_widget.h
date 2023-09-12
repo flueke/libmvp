@@ -20,20 +20,32 @@ class MvlcConnectWidget: public QWidget
 {
     Q_OBJECT
     signals:
-        void mvlcChanged(const QVariantMap &mvlc);
+        // Explicit connection request via the connect button. Can be used to
+        // verify the connection works.
+        void connectMvlc(const QVariantMap &info);
+
+        // Implicit changes to the connection info, e.g. by editing some combo
+        // box text or selecting a usb device.
+        void mvlcChanged(const QVariantMap &info);
         void scanbusRequested();
+        void usbRefreshRequested();
         void logMessage(const QString &msg);
 
     public:
         MvlcConnectWidget(QWidget *parent = nullptr);
         ~MvlcConnectWidget() override;
 
-        void setIsConnected(bool isConnected);
+        //void setIsConnected(bool isConnected);
         QVariantMap getConnectInfo();
 
     public slots:
         void setConnectInfo(const QVariantMap &info);
-        void setScanbusResult(const QVariantMap &data);
+        void setScanbusResult(const QVariantList &scanbusResult);
+        void setUsbDevices(const QVariantList &usbDevices);
+
+    private slots:
+        void onConnectButtonClicked();
+        void onConnectInfoChangedInWidget();
 
     private:
         struct Private;

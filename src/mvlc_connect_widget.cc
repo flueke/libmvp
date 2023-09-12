@@ -2,7 +2,12 @@
 #include "ui_mvlc_connect_widget.h"
 
 #include <mesytec-mvlc/mvlc_impl_usb.h>
+#include <QDebug>
+#include <QDialog>
+#include <QHeaderView>
 #include <QSettings>
+#include <QTableWidget>
+#include <QTextStream>
 
 namespace mesytec::mvp
 {
@@ -66,6 +71,7 @@ struct MvlcConnectWidget::Private
     MvlcConnectWidget *q;
     Ui::MvlcConnectWidget ui_;
     bool isConnected_ = false;
+    QVariantList prevUsbDevices_;
 
     bool isEth() const
     {
@@ -103,15 +109,35 @@ MvlcConnectWidget::MvlcConnectWidget(QWidget *parent)
     d->q = this;
     d->ui_.setupUi(this);
     d->ui_.combo_vmeAddress->setCurrentText("0x00000000");
-    d->ui_.pb_scanbus->setEnabled(false); // TODO: implement scanbus functionality to locate target devices.
 
     connect(d->ui_.pb_scanbus, &QPushButton::clicked, this, &MvlcConnectWidget::scanbusRequested);
+    connect(d->ui_.pb_connect_eth, &QPushButton::clicked, this, &MvlcConnectWidget::onConnectButtonClicked);
+    connect(d->ui_.pb_connect_usb, &QPushButton::clicked, this, &MvlcConnectWidget::onConnectButtonClicked);
+
+    connect(d->ui_.combo_eth, &QComboBox::currentTextChanged,
+        this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
+    connect(d->ui_.combo_eth, qOverload<int>(&QComboBox::currentIndexChanged),
+        this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
+
+    connect(d->ui_.combo_usb, qOverload<int>(&QComboBox::currentIndexChanged),
+        this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
+
+    connect(d->ui_.combo_vmeAddress, &QComboBox::currentTextChanged,
+        this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
+    connect(d->ui_.combo_vmeAddress, qOverload<int>(&QComboBox::currentIndexChanged),
+        this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
+
+    // Switching between the USB and ETH tabs also needs to update the
+    // connection info.
+    connect(d->ui_.tabs_connectMethod, &QTabWidget::currentChanged,
+        this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
 }
 
 MvlcConnectWidget::~MvlcConnectWidget()
 {
 }
 
+#if 0
 void MvlcConnectWidget::setIsConnected(bool isConnected)
 {
     if (auto pb = d->activeConnectButton())
@@ -122,13 +148,27 @@ void MvlcConnectWidget::setIsConnected(bool isConnected)
             pb->setText("Connect");
     }
 }
+#endif
 
 QVariantMap MvlcConnectWidget::getConnectInfo()
 {
     if (auto combo = d->activeConnectCombo())
     {
-        auto result = combo->currentData().toMap();
-        result["vme_address"] = d->ui_.combo_vmeAddress->currentData();
+        QVariantMap result;
+
+        if (d->isEth())
+        {
+            result["method"] = "eth";
+            result["address"] = combo->currentText();
+        }
+        else if (d->isUsb())
+        {
+            result["method"] = "usb";
+            result = combo->currentData().toMap();
+        }
+
+        result["vme_address"] = d->ui_.combo_vmeAddress->currentText();
+
         return result;
     }
     return {};
@@ -149,11 +189,149 @@ void MvlcConnectWidget::setConnectInfo(const QVariantMap &info)
     }
 }
 
-void MvlcConnectWidget::setScanbusResult(const QVariantMap &data)
+void MvlcConnectWidget::setScanbusResult(const QVariantList &scanbusResult)
 {
     // TODO: show a list of found vme devices.
     // allow the user to double click a device to select
     // on device selection update the vme target address box
+
+    const QStringList headerLabels =
+    {
+        "Address",
+        "HardwareId",
+        "FirmwareId",
+        "Module Type",
+        "Firmware Type"
+    };
+
+    auto table = new QTableWidget(this);
+    table->setRowCount(scanbusResult.size());
+    table->setColumnCount(headerLabels.size());
+    table->setHorizontalHeaderLabels(headerLabels);
+    table->verticalHeader()->hide();
+    table->setSelectionMode(QAbstractItemView::SingleSelection);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+
+    unsigned currentRow = 0;
+
+    for (const auto &var: scanbusResult)
+    {
+        const auto m = var.toMap();
+        mvlc::u32 vmeAddress = m["address"].toUInt();
+        auto item0 = new QTableWidgetItem(tr("0x%1").arg(vmeAddress, 8, 16, QLatin1Char('0')));
+        auto item1 = new QTableWidgetItem(tr("0x%1").arg(m["hwId"].toUInt(), 4, 16, QLatin1Char('0')));
+        auto item2 = new QTableWidgetItem(tr("0x%1").arg(m["fwId"].toUInt(), 4, 16, QLatin1Char('0')));
+        auto item3 = new QTableWidgetItem(m["module_type"].toString());
+        auto item4 = new QTableWidgetItem(m["firmware_type"].toString());
+
+        auto items = { item0, item1, item2, item3, item4 };
+        unsigned col = 0;
+
+        for (auto item: items)
+        {
+            item->setData(Qt::UserRole, vmeAddress);
+            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            table->setItem(currentRow, col++, item);
+        }
+
+        ++currentRow;
+    }
+
+    table->resizeColumnsToContents();
+    table->resizeRowsToContents();
+
+    QDialog dlg;
+    dlg.setWindowTitle("Scanbus Results");
+    dlg.setWindowIcon(QIcon(":/window-icon.png"));
+    auto dlgLayout = new QVBoxLayout(&dlg);
+    auto explanation = new QLabel("Double click a line to use the address as the VME Target Device address");
+    explanation->setWordWrap(true);
+    dlgLayout->addWidget(explanation);
+    dlgLayout->addWidget(table);
+    dlg.resize(600, 400);
+
+    mvlc::u32 selectedVMEAddress = 0u;
+
+    connect(table, &QTableWidget::itemDoubleClicked,
+        &dlg, [&] (QTableWidgetItem *item)
+        {
+            selectedVMEAddress = item->data(Qt::UserRole).toUInt();
+            dlg.accept();
+        });
+
+    if (dlg.exec() == QDialog::Accepted)
+    {
+        auto &combo = d->ui_.combo_vmeAddress;
+        auto addressText = tr("0x%1").arg(selectedVMEAddress, 8, 16, QLatin1Char('0'));
+
+        if (int idx = combo->findText(addressText); idx >= 0)
+        {
+            combo->setCurrentIndex(idx);
+        }
+        else
+        {
+            combo->addItem(addressText);
+            combo->setCurrentIndex(combo->count() - 1);
+        }
+    }
+}
+
+void MvlcConnectWidget::setUsbDevices(const QVariantList &usbDevices)
+{
+    if (usbDevices == d->prevUsbDevices_)
+        return;
+
+    auto &combo = d->ui_.combo_usb;
+
+    const auto currentInfo = combo->currentData().toMap();
+    qDebug() << __PRETTY_FUNCTION__ << "currentInfo" << currentInfo;
+    qDebug() << __PRETTY_FUNCTION__ << "usbDevices" << usbDevices;
+
+    QSignalBlocker b(combo);
+
+    combo->clear();
+
+    for (const auto &var: usbDevices)
+    {
+        const auto m = var.toMap();
+        combo->addItem(get_mvlc_connect_info_title(m), m);
+    }
+
+    int idx = 0;
+
+    if (!currentInfo.isEmpty())
+    {
+        for (int i=0; i<combo->count(); ++i)
+        {
+            auto m = combo->itemData(i).toMap();
+            if (m["serial"] == currentInfo["serial"])
+            {
+                idx = i;
+                break;
+            }
+        }
+        //idx = combo->findData(currentInfo);
+        //idx = idx >= 0 ? idx : 0;
+    }
+
+    combo->setCurrentIndex(idx);
+    d->prevUsbDevices_ = usbDevices;
+
+    // Note: USB might not be the currently active connection method but it's
+    // easier to just emit the signal anyways. getConnectInfo() will correctly
+    // determine the active connection method and return the correct info.
+    emit mvlcChanged(getConnectInfo());
+}
+
+void MvlcConnectWidget::onConnectButtonClicked()
+{
+    emit connectMvlc(getConnectInfo());
+}
+
+void MvlcConnectWidget::onConnectInfoChangedInWidget()
+{
+    qDebug() << __PRETTY_FUNCTION__ << "connectInfo=" << getConnectInfo();
+    emit mvlcChanged(getConnectInfo());
 }
 
 QString get_mvlc_connect_info_title(const QVariantMap &info)

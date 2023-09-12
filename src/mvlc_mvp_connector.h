@@ -9,15 +9,22 @@ namespace mesytec::mvp
 class MvlcMvpConnector: public MvpConnectorInterface
 {
     Q_OBJECT
+    signals:
+        void scanbusResultReady(const QVariantList &scanbusResult);
+        void usbDevicesChanged(const QVariantList &deviceInfos);
+        void logMessage(const QString &msg);
+
     public:
         MvlcMvpConnector(QObject *parent = nullptr);
         ~MvlcMvpConnector() override;
         void open() override;
         void close() override;
         FlashInterface *getFlash() override;
+        QVariantList scanbus();
 
     public slots:
         void setConnectInfo(const QVariantMap &info) override;
+        void refreshUsbDevices();
 
     private:
         struct Private;
