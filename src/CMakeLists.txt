@@ -55,7 +55,7 @@ add_library(libmvp
     mvp_advanced_widget.ui
     mvp_connector_interface.cc
     port_helper.cc
-    resources.qrc
+    libmvp_resources.qrc
     serial_port_connect_widget.cc
     serial_port_flash.cc
     serial_port_mvp_connector.cc
