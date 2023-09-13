@@ -133,8 +133,8 @@ std::error_code write_page4(
 std::error_code write_pages(
     MVLC &mvlc, u32 moduleBase,
     const u32 firstPageAddress, u8 section,
-    const std::vector<u8> &page1,
-    const std::vector<u8> &page2 = {});
+    const gsl::span<u8> &page1,
+    const gsl::span<u8> &page2 = {});
 
 std::error_code erase_section(
     MVLC &mvlc, u32 moduleBase, u8 index);

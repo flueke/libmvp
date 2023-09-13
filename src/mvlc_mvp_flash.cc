@@ -135,11 +135,31 @@ void MvlcMvpFlash::erase_section(uchar section)
         throw std::system_error(ec);
 }
 
-void MvlcMvpFlash::write_memory(const Address &start, uchar section, const gsl::span<uchar> data)
+void MvlcMvpFlash::write_memory(const Address &start, uchar section, const gsl::span<uchar> mem)
 {
-    // TODO: split data into constants::page_size sized parts. Pass two parts to
-    // write_pages(). Make sure all data is written and page splitting is done
-    // correctly.
+    // Split mem into page sized parts and pass up to two parts to
+    // write_pages()
+    Address addr(start);
+    size_t remaining = mem.size();
+    size_t offset    = 0;
+
+    emit progress_range_changed(0, mem.size());
+
+    while (remaining) {
+        auto len = std::min(constants::page_size * 2, remaining);
+        gsl::span page1(mem.data() + offset, std::min(constants::page_size, len));
+        gsl::span page2(mem.data() + offset + page1.size(), std::min(constants::page_size, len - page1.size()));
+
+        assert(page1.size() + page2.size() == len);
+
+        write_pages(mvlc_, vmeAddress_, addr.to_int(), section, page1, page2);
+
+        remaining -= len;
+        addr      += len;
+        offset    += len;
+
+        emit progress_changed(offset);
+    }
 }
 
 }

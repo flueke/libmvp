@@ -736,8 +736,8 @@ std::error_code write_page4(
 std::error_code write_pages(
     MVLC &mvlc, u32 moduleBase,
     const u32 firstPageAddress, u8 section,
-    const std::vector<u8> &page1,
-    const std::vector<u8> &page2)
+    const gsl::span<u8> &page1,
+    const gsl::span<u8> &page2)
 {
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
 
@@ -776,6 +776,7 @@ std::error_code write_pages(
     {
         if (pageBuffer.empty())
             continue;
+
         const u8 lenByte = pageBuffer.size() == PageSize ? 0 : pageBuffer.size();
 
         // EFW - enable flash write. This is written back to the output fifo by the
@@ -852,10 +853,16 @@ std::error_code write_pages(
         return MVLCErrorCode::StackReferenceMismatch;
     }
 
+    // Use clear_output_fifo() to log the remaining data in case of issues.
+    if (auto ec = clear_output_fifo(mvlc, moduleBase))
+        return ec;
+
     // TODO: this needs adjustments to be able to parse both EfwRequest responses.
     std::vector<u8> flashResponse;
     std::copy(std::begin(stackResponse) + 2, std::end(stackResponse), std::back_inserter(flashResponse));
 
+    // FIXME: this might appear to work for the doubled flash response but is
+    // not entirely correct: only the second pages response code will checked.
     if (!check_response(EfwRequest, flashResponse))
     {
         logger->error("write_pages(): flash check_response() failed");
