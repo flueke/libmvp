@@ -135,4 +135,11 @@ void MvlcMvpFlash::erase_section(uchar section)
         throw std::system_error(ec);
 }
 
+void MvlcMvpFlash::write_memory(const Address &start, uchar section, const gsl::span<uchar> data)
+{
+    // TODO: split data into constants::page_size sized parts. Pass two parts to
+    // write_pages(). Make sure all data is written and page splitting is done
+    // correctly.
+}
+
 }

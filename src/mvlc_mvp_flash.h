@@ -51,6 +51,8 @@ class MvlcMvpFlash: public mesytec::mvp::FlashInterface
 
         void erase_section(uchar section) override;
 
+        void write_memory(const Address &start, uchar section, const gsl::span<uchar> data) override;
+
     private:
         mvlc::MVLC mvlc_;
         mvlc::u32 vmeAddress_ = 0;

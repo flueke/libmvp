@@ -733,6 +733,143 @@ std::error_code write_page4(
     return {};
 }
 
+std::error_code write_pages(
+    MVLC &mvlc, u32 moduleBase,
+    const u32 firstPageAddress, u8 section,
+    const std::vector<u8> &page1,
+    const std::vector<u8> &page2)
+{
+    auto logger = mvlc::get_logger("mvlc_mvp_lib");
+
+    if (page1.empty()) // page2 is optional
+        throw std::invalid_argument("write_pages: empty page1 data given");
+
+    if (page1.size() > PageSize)
+        throw std::invalid_argument("write_pages: page1 size > max page size");
+
+    if (page2.size() > PageSize)
+        throw std::invalid_argument("write_pages: page2 size > max page size");
+
+    static const std::vector<u8> EfwRequest = { mesytec::mvp::opcodes::EFW, 0xCD, 0xAB };
+    static const u32 StackReferenceMarker = 0x13370001u;
+    static const unsigned ExpectedFlashResponseSize = 5;
+    auto tStart = std::chrono::steady_clock::now();
+
+    unsigned expectedResponseSize = 0;
+    for (const auto &pageBuffer: { page1, page2 })
+    {
+        if (!pageBuffer.empty())
+            expectedResponseSize += ExpectedFlashResponseSize;
+    }
+
+    // Response structure: 0xF3 stack frame header, reference marker word, data
+    // words from vme reads.
+    const unsigned ExpectedStackResponseSize = 2 + expectedResponseSize;
+
+    u32 destAddr = firstPageAddress;
+
+    StackCommandBuilder sb;
+    // Initial marker so that stackTransaction() has a reference word.
+    sb.addWriteMarker(StackReferenceMarker);
+
+    for (const auto &pageBuffer: { page1, page2 })
+    {
+        if (pageBuffer.empty())
+            continue;
+        const u8 lenByte = pageBuffer.size() == PageSize ? 0 : pageBuffer.size();
+
+        // EFW - enable flash write. This is written back to the output fifo by the
+        // flash interface.
+        for (auto op: EfwRequest)
+            sb.addVMEWrite(moduleBase + InputFifoRegister, op,  vme_amods::A32, VMEDataWidth::D16);
+
+        auto addr = flash_address_from_byte_offset(destAddr);
+        destAddr += pageBuffer.size();
+
+        // WRF - write flash. This is not written back to the output fifo.
+        sb.addVMEWrite(moduleBase + InputFifoRegister, opcodes::WRF, vme_amods::A32, VMEDataWidth::D16);
+        sb.addVMEWrite(moduleBase + InputFifoRegister, addr[0],      vme_amods::A32, VMEDataWidth::D16);
+        sb.addVMEWrite(moduleBase + InputFifoRegister, addr[1],      vme_amods::A32, VMEDataWidth::D16);
+        sb.addVMEWrite(moduleBase + InputFifoRegister, addr[2],      vme_amods::A32, VMEDataWidth::D16);
+        sb.addVMEWrite(moduleBase + InputFifoRegister, section,      vme_amods::A32, VMEDataWidth::D16);
+        sb.addVMEWrite(moduleBase + InputFifoRegister, lenByte,      vme_amods::A32, VMEDataWidth::D16);
+
+        // Add the actual page data to the stack.
+        for (auto dataWord: pageBuffer)
+            sb.addVMEWrite(moduleBase + InputFifoRegister, dataWord, vme_amods::A32, VMEDataWidth::D16);
+
+        // Wait for a couple of cycles before continuing with the stack (max value
+        // is 24 bit). Without the wait the output fifo will be in an invalid state
+        // as the commands from the input fifo are still being processed by the
+        // flash interface.
+        sb.addWait(100000);
+
+        // Accu loop: read the statusregister until it's 0, meaning "flash output fifo not empty".
+        sb.addReadToAccu(moduleBase + StatusRegister, vme_amods::A32, VMEDataWidth::D16);
+        sb.addCompareLoopAccu(AccuComparator::EQ, 0);
+
+        // Now read the flash response from the flash output fifo.
+        for (unsigned i=0; i<ExpectedFlashResponseSize; ++i)
+            sb.addVMERead(moduleBase + OutputFifoRegister, vme_amods::A32, VMEDataWidth::D16);
+    }
+
+    logger->debug("write_pages(): performing stackTransaction: page1={} bytes, page2={} bytes, stackCommands={}"
+                  ", encodedStackSize={} words",
+                  page1.size(), page2.size(), sb.commandCount(), get_encoded_stack_size(sb));
+
+    std::vector<u32> stackResponse;
+
+    if (auto ec = mvlc.stackTransaction(sb, stackResponse))
+    {
+        logger->error("write_pages(): stackTransaction failed: {}", ec.message());
+        return ec;
+    }
+
+    logger->debug("write_pages(): response from stackTransaction: size={}, data={:#08x}",
+                    stackResponse.size(), fmt::join(stackResponse, ", "));
+
+    if (stackResponse.size() != expectedResponseSize)
+    {
+        logger->error("write_pages(): stack response too short! got {} words, expected {} words",
+            stackResponse.size(), ExpectedStackResponseSize);
+        return make_error_code(std::errc::protocol_error);
+    }
+
+    if (extract_frame_info(stackResponse[0]).flags & frame_flags::AllErrorFlags)
+    {
+        if (extract_frame_info(stackResponse[0]).flags & frame_flags::Timeout)
+            return MVLCErrorCode::NoVMEResponse;
+
+        if (extract_frame_info(stackResponse[0]).flags & frame_flags::SyntaxError)
+            return MVLCErrorCode::StackSyntaxError;
+
+        // Note: BusError can not happen as there's no block read in the stack
+    }
+
+    if (stackResponse[1] != StackReferenceMarker)
+    {
+        logger->error("write_pages(): stack response does not start with the reference marker");
+        return MVLCErrorCode::StackReferenceMismatch;
+    }
+
+    // TODO: this needs adjustments to be able to parse both EfwRequest responses.
+    std::vector<u8> flashResponse;
+    std::copy(std::begin(stackResponse) + 2, std::end(stackResponse), std::back_inserter(flashResponse));
+
+    if (!check_response(EfwRequest, flashResponse))
+    {
+        logger->error("write_pages(): flash check_response() failed");
+        return make_error_code(std::errc::protocol_error);
+    }
+
+    auto tEnd = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart);
+    logger->info("write_pages(): took {} ms to write {} bytes of data",
+                 elapsed.count()/1000.0, page1.size() + page2.size());
+
+    return {};
+}
+
 std::error_code erase_section(
     MVLC &mvlc, u32 moduleBase, u8 index)
 {

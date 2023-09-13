@@ -204,6 +204,7 @@ namespace mvp
 
       // virtual but with default implementation
       virtual void erase_section(uchar section);
+      virtual void write_memory(const Address &start, uchar section, const gsl::span<uchar> data);
 
       // non-virtual
       virtual void nop();
@@ -228,9 +229,6 @@ namespace mvp
         const gsl::span<uchar> &response_code) const;
 
       void ensure_clean_state();
-
-      void write_memory(const Address &start, uchar section,
-        const gsl::span<uchar> data);
 
       QVector<uchar> read_memory(const Address &start, uchar section,
         size_t len, size_t chunk_size, EarlyReturnFun f = nullptr);
