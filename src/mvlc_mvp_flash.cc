@@ -137,7 +137,7 @@ void MvlcMvpFlash::erase_section(uchar section)
 
 void MvlcMvpFlash::write_memory(const Address &start, uchar section, const gsl::span<uchar> mem)
 {
-    #if 0
+    #if 1
     // Split mem into page sized parts and pass up to two parts to
     // write_pages()
     Address addr(start);
