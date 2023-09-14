@@ -1,7 +1,10 @@
 #include "mvlc_mvp_lib.h"
-#include <flash_constants.h>
+#include <array>
 #include <chrono>
 #include <stdexcept>
+#include <vector>
+
+#include <flash_constants.h>
 
 namespace mesytec::mvp
 {
@@ -751,11 +754,11 @@ std::error_code write_pages(
         throw std::invalid_argument("write_pages: page2 size > max page size");
 
     static const std::vector<u8> EfwRequest = { mesytec::mvp::opcodes::EFW, 0xCD, 0xAB };
+    static const unsigned ExpectedFlashResponseSize = EfwRequest.size() + 2; // mirror of the EfwRequest + fifo 0xff + fifo status
     static const u32 StackReferenceMarker = 0x13370001u;
-    static const unsigned ExpectedFlashResponseSize = 5;
     auto tStart = std::chrono::steady_clock::now();
 
-    unsigned expectedResponseSize = 0;
+    unsigned expectedResponseSize = 2; // 0xF3 stack frame header + reference marker word
     for (const auto &pageBuffer: { page1, page2 })
     {
         if (!pageBuffer.empty())
@@ -764,7 +767,6 @@ std::error_code write_pages(
 
     // Response structure: 0xF3 stack frame header, reference marker word, data
     // words from vme reads.
-    const unsigned ExpectedStackResponseSize = 2 + expectedResponseSize;
 
     u32 destAddr = firstPageAddress;
 
@@ -831,8 +833,8 @@ std::error_code write_pages(
 
     if (stackResponse.size() != expectedResponseSize)
     {
-        logger->error("write_pages(): stack response too short! got {} words, expected {} words",
-            stackResponse.size(), ExpectedStackResponseSize);
+        logger->error("write_pages(): unexpected stack response size! got {} words, expected {} words",
+            stackResponse.size(), expectedResponseSize);
         return make_error_code(std::errc::protocol_error);
     }
 
@@ -854,24 +856,29 @@ std::error_code write_pages(
     }
 
     // Use clear_output_fifo() to log the remaining data in case of issues.
-    if (auto ec = clear_output_fifo(mvlc, moduleBase))
-        return ec;
+    //if (auto ec = clear_output_fifo(mvlc, moduleBase))
+    //    return ec;
 
-    // TODO: this needs adjustments to be able to parse both EfwRequest responses.
-    std::vector<u8> flashResponse;
-    std::copy(std::begin(stackResponse) + 2, std::end(stackResponse), std::back_inserter(flashResponse));
+    std::vector<u8> flashResponse0(std::begin(stackResponse) + 2, std::begin(stackResponse) + 2 + 5);
+    std::vector<u8> flashResponse1(std::begin(stackResponse) + 2 + flashResponse0.size(), std::end(stackResponse));
 
-    // FIXME: this might appear to work for the doubled flash response but is
-    // not entirely correct: only the second pages response code will checked.
-    if (!check_response(EfwRequest, flashResponse))
+    if (!check_response(EfwRequest, flashResponse0))
     {
-        logger->error("write_pages(): flash check_response() failed");
+        logger->error("write_pages(): flash check_response() failed for the first page, response={:#02x}",
+            fmt::join(flashResponse0, ", "));
+        return make_error_code(std::errc::protocol_error);
+    }
+
+    if (!page2.empty() && !check_response(EfwRequest, flashResponse1))
+    {
+        logger->error("write_pages(): flash check_response() failed for the second page, response={:#02x}",
+            fmt::join(flashResponse1, ", "));
         return make_error_code(std::errc::protocol_error);
     }
 
     auto tEnd = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart);
-    logger->info("write_pages(): took {} ms to write {} bytes of data",
+    logger->debug("write_pages(): took {} ms to write {} bytes of data",
                  elapsed.count()/1000.0, page1.size() + page2.size());
 
     return {};

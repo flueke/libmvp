@@ -137,11 +137,13 @@ void MvlcMvpFlash::erase_section(uchar section)
 
 void MvlcMvpFlash::write_memory(const Address &start, uchar section, const gsl::span<uchar> mem)
 {
+    #if 0
     // Split mem into page sized parts and pass up to two parts to
     // write_pages()
     Address addr(start);
     size_t remaining = mem.size();
     size_t offset    = 0;
+    size_t callsToWritePages = 0;
 
     emit progress_range_changed(0, mem.size());
 
@@ -152,14 +154,22 @@ void MvlcMvpFlash::write_memory(const Address &start, uchar section, const gsl::
 
         assert(page1.size() + page2.size() == len);
 
-        write_pages(mvlc_, vmeAddress_, addr.to_int(), section, page1, page2);
+        if (auto ec = write_pages(mvlc_, vmeAddress_, addr.to_int(), section, page1, page2))
+            throw std::system_error(ec);
 
+        ++callsToWritePages;
         remaining -= len;
         addr      += len;
         offset    += len;
 
         emit progress_changed(offset);
     }
+
+    qDebug() << __PRETTY_FUNCTION__ << "write_memory(): needed" << callsToWritePages << "calls to write_pages()";
+
+    #else
+    FlashInterface::write_memory(start, section, mem);
+    #endif
 }
 
 }
