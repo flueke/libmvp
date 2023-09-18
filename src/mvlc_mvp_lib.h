@@ -128,6 +128,14 @@ std::error_code write_page4(
     const FlashAddress &addr, u8 section,
     const std::vector<u8> &pageBuffer);
 
+// Improved version of write_page4() allowing to write up to two full pages per
+// stack transaction.
+std::error_code write_pages(
+    MVLC &mvlc, u32 moduleBase,
+    const u32 firstPageAddress, u8 section,
+    const gsl::span<u8> &page1,
+    const gsl::span<u8> &page2 = {});
+
 std::error_code erase_section(
     MVLC &mvlc, u32 moduleBase, u8 index);
 
