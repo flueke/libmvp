@@ -47,6 +47,8 @@ class MVPLabGui: public QMainWindow
     explicit MVPLabGui(QWidget *parent=0);
     virtual ~MVPLabGui();
 
+    QAction *getToggleAdvancedAction();
+
   protected:
     virtual void closeEvent(QCloseEvent *event) override;
 

@@ -277,6 +277,11 @@ MVPLabGui::~MVPLabGui()
   delete m_object_holder;
 }
 
+QAction *MVPLabGui::getToggleAdvancedAction()
+{
+  return ui->actionShowAdvanced;
+}
+
 void MVPLabGui::_on_start_button_clicked()
 {
   write_firmware();
@@ -651,6 +656,7 @@ void MVPLabGui::on_actionAbout_triggered()
 {
     const auto appName = qApp->applicationName();
     const auto appDisplayName = qApp->applicationDisplayName();
+    const auto appVersion = qApp->applicationVersion();
 
     auto dialog = new QDialog(this);
     dialog->setWindowTitle(QSL("About %1").arg(appName));
@@ -675,7 +681,7 @@ void MVPLabGui::on_actionAbout_triggered()
     }
 
     {
-        QString text = QString("%1 - %2").arg(appName).arg(library_version());
+        QString text = QString("%1 - %2").arg(appName).arg(appVersion);
         auto label = new QLabel;
         auto font = label->font();
         font.setPointSize(15);
@@ -685,7 +691,7 @@ void MVPLabGui::on_actionAbout_triggered()
     }
 
     layout->addWidget(new QLabel(appDisplayName));
-    layout->addWidget(new QLabel(QString("Version %1").arg(library_version())));
+    layout->addWidget(new QLabel(QString("Version %1").arg(appVersion)));
     layout->addWidget(new QLabel(QSL("© 2015-2023 mesytec GmbH & Co. KG")));
     layout->addWidget(new QLabel(QSL("Authors: F. Lüke")));
 
