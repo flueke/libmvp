@@ -137,7 +137,15 @@ void MvlcMvpFlash::erase_section(uchar section)
 
 void MvlcMvpFlash::write_memory(const Address &start, uchar section, const gsl::span<uchar> mem)
 {
-    #if 1
+    // Note (230919): write_pages() does not lead to a noticeable speedup when
+    // flashing firmware packages. The reason is that the stack uploads
+    // (consisting purely of "super" commands) are still transaction based,
+    // meaning the PC has to wait for a response from the MVLC for each part of
+    // the stack that's been written. The core implementation will have to
+    // change to allow "blindly" sending out all the partial stack uploads to
+    // the MVLC before waiting for a response. This could lead to a massive
+    // speedup due to less command ping-pong happening.
+    #if 0
     // Split mem into page sized parts and pass up to two parts to
     // write_pages()
     Address addr(start);
