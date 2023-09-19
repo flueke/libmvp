@@ -157,6 +157,8 @@ std::error_code write_instruction(MVLC &mvlc, u32 moduleBase, const gsl::span<un
 
 std::error_code read_response(MVLC &mvlc, u32 moduleBase, std::vector<u8> &dest)
 {
+    auto logger = mvlc::get_logger("mvlc_mvp_lib");
+
     while (true) // FIXME: dangerous. do time out at some point
     {
         u32 fifoValue = 0;
@@ -169,12 +171,14 @@ std::error_code read_response(MVLC &mvlc, u32 moduleBase, std::vector<u8> &dest)
         }
 
         if (fifoValue & output_fifo_flags::InvalidRead)
+        {
+            logger->debug("read_response: fifoValue (0x{:02x}) has InvalidRead set, breaking out of read loop", fifoValue);
             break;
+        }
 
         dest.push_back(fifoValue & 0xff);
     }
 
-    auto logger = mvlc::get_logger("mvlc_mvp_lib");
     logger->debug("read_response: moduleBase=0x{:08x}, got {} bytes: {:02x}",
                  moduleBase, dest.size(), fmt::join(dest, ", "));
     return {};
@@ -184,6 +188,9 @@ bool check_response(const std::vector<u8> &request,
                     const std::vector<u8> &response)
 {
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
+
+    logger->trace("check_response: request ={:#04x}", fmt::join(request, ","));
+    logger->trace("check_response: response={:#04x}", fmt::join(response, ","));
 
     if (response.size() < 2)
     {
@@ -730,8 +737,8 @@ std::error_code write_page4(
 
     auto tEnd = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart);
-    logger->info("write_page4(): took {} ms to write {} bytes of data",
-                 elapsed.count()/1000.0, pageBuffer.size());
+    logger->debug("write_page4(): took {} ms to write {} bytes of data",
+                  elapsed.count() / 1000.0, pageBuffer.size());
 
     return {};
 }
@@ -957,6 +964,50 @@ std::error_code erase_section(
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart);
 
     logger->info("flash response status ok, erasing took {} ms", elapsed.count());
+
+    return {};
+}
+
+std::error_code read_flash_memory(
+    MVLC &mvlc,
+    u32 vmeAddress,
+    unsigned area,
+    u32 memAddress,
+    unsigned section,
+    size_t len,
+    std::vector<u8> &dest)
+{
+    static const size_t ChunkSize = mesytec::mvp::constants::page_size;
+
+    dest.reserve(len);
+    u32 addr = memAddress;
+    size_t remaining = len;
+
+    if (auto ec = enable_flash_interface(mvlc, vmeAddress))
+        return ec;
+
+    if (auto ec = set_verbose_mode(mvlc, vmeAddress, false))
+        return ec;
+
+    if (auto ec = set_area_index(mvlc, vmeAddress, area))
+        return ec;
+
+    while (remaining)
+    {
+        auto rl = std::min(ChunkSize, remaining);
+        std::vector<u8> pageBuffer;
+
+        if (auto ec = read_page(mvlc, vmeAddress, flash_address_from_byte_offset(addr),
+            section, rl, pageBuffer))
+        {
+            return ec;
+        }
+
+        std::copy(std::begin(pageBuffer), std::end(pageBuffer), std::back_inserter(dest));
+
+        remaining -= rl;
+        addr += rl;
+    }
 
     return {};
 }

@@ -121,15 +121,15 @@ std::error_code write_page3(
 // response words from the output fifo. This is the final stack response that
 // has to be parsed by software.
 // During development/debugging an additional check can be done:
-// clear_output_fifo() should return after one cycle if the stack words
+// clear_output_fifo() should return after one cycle if the stack works
 // correctly.
 std::error_code write_page4(
     MVLC &mvlc, u32 moduleBase,
     const FlashAddress &addr, u8 section,
     const std::vector<u8> &pageBuffer);
 
-// Improved version of write_page4() allowing to write up to two full pages per
-// stack transaction.
+// Improved/extra complicated version of write_page4() allowing to write up to
+// two full pages per stack transaction.
 std::error_code write_pages(
     MVLC &mvlc, u32 moduleBase,
     const u32 firstPageAddress, u8 section,
@@ -142,6 +142,15 @@ std::error_code erase_section(
 void fill_page_buffer_from_stack_output(
     std::vector<u8> &pageBuffer, const std::vector<u32> stackOutput);
 
+
+std::error_code read_flash_memory(
+    MVLC &mvlc,
+    u32 vmeAddress,
+    unsigned area,
+    u32 memAddress,
+    unsigned section,
+    size_t len,
+    std::vector<u8> &dest);
 }
 
 #endif /* __MESYTEC_MVLC_MVP_LIB_H__ */
