@@ -48,6 +48,8 @@ add_library(libmvp
     flash.cc
     flash_widget.cc
     flash_widget.ui
+    gui.cc
+    gui.ui
     instruction_file.cc
     instruction_interpreter.cc
     mdpp16.cc
