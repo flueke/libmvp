@@ -38,8 +38,6 @@ void MvlcMvpConnector::open()
 
     const auto &m = d->connectInfo_;
 
-    qDebug() << __PRETTY_FUNCTION__ << m;
-
     if (m["method"] == "eth")
         d->mvlc_ = mvlc::make_mvlc_eth(m["address"].toString().toStdString());
     else if (m["method"] == "usb")
@@ -74,7 +72,6 @@ FlashInterface *MvlcMvpConnector::getFlash()
 
 void MvlcMvpConnector::setConnectInfo(const QVariantMap &info)
 {
-    qDebug() << __PRETTY_FUNCTION__ << "new connect info: " << info;
     d->connectInfo_ = info;
 }
 

@@ -33,7 +33,7 @@ class ThreadMover
       : m_object(object)
       , m_thread(object->thread())
     {
-      qDebug() << this << "moving" << object.get() << "to target thread" << target_thread;
+      //qDebug() << this << "moving" << object.get() << "to target thread" << target_thread;
 
       m_object->moveToThread(target_thread);
 
@@ -43,7 +43,7 @@ class ThreadMover
 
     ~ThreadMover()
     {
-      qDebug() << this << "moving" << m_object << "to original thread" << m_thread;
+      //qDebug() << this << "moving" << m_object << "to original thread" << m_thread;
       m_object->moveToThread(m_thread);
     }
 
@@ -75,10 +75,10 @@ QFuture<T> run_in_thread(Func func, QObject *thread_dependent_obj)
   return QtConcurrent::run([=] {
       try {
         ThreadMover tm(thread_dependent_obj, QThread::currentThread());
-        qDebug() << "run_in_thread: calling functor";
+        //qDebug() << "run_in_thread: calling functor";
         return func();
       } catch (...) {
-        qDebug() << "run_in_thread: exception caught";
+        //qDebug() << "run_in_thread: exception caught";
         throw QtExceptionPtr(std::current_exception());
       }
     });
@@ -91,7 +91,7 @@ T run_in_thread_wait_in_loop(Func func, QObject *thread_dependent_obj,
   QEventLoop loop;
 
   auto con = QObject::connect(&fw, &QFutureWatcher<void>::finished, [&]() {
-      qDebug() << "exiting local event loop";
+      //qDebug() << "exiting local event loop";
       loop.quit();
     });
 
@@ -114,7 +114,7 @@ void run_in_thread_wait_in_loop(Func func, QObject *thread_dependent_obj,
   QEventLoop loop;
 
   auto con = QObject::connect(&fw, &QFutureWatcher<void>::finished, [&]() {
-      qDebug() << "exiting local event loop";
+      //qDebug() << "exiting local event loop";
       loop.quit();
     });
 
