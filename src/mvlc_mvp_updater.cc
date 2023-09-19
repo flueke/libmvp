@@ -3,12 +3,13 @@
 #include <mesytec-mvlc/util/string_util.h>
 #include <mvlc_mvp_lib.h>
 #include <mvlc_mvp_flash.h>
+#include <git_version.h>
 
 using namespace mesytec::mvlc;
 using namespace mesytec::mvp;
 
+// Parse a string to type T using the supplied converter function.
 // Converter signature is 'T converter(const std::string &str)'
-
 template<typename T, typename Converter>
 bool parse_into(argh::parser &parser, const std::string &param, T &dest, Converter conv)
 {
@@ -49,7 +50,7 @@ std::pair<MVLC, std::error_code> make_and_connect_default_mvlc(argh::parser &par
 
     if (!mvlc)
     {
-        std::cerr << "Error: no MVLC to connect to\n";
+        std::cerr << "Error: no MVLC connection specified.\n";
         return std::pair<MVLC, std::error_code>();
     }
 
@@ -115,8 +116,9 @@ DEF_EXEC_FUNC(list_commands_command)
 static const Command ListCmdsCommand =
 {
     .name = "list-commands",
-    .help = R"~(Raw help for the 'list-commands' command
-)~",
+    .help = unindent(R"~(
+List all registered commands.
+)~"),
     .exec = list_commands_command,
 };
 
@@ -271,14 +273,14 @@ static const Command ScanbusCommand
 {
     .name = "scanbus",
     .help = unindent(R"~(
-usage: mvlc-cli scanbus [--scan-begin=<addr>] [--scan-end=<addr>] [--probe-register=<addr>]
-                        [--probe-amod=<amod>] [--probe-datawidth=<datawidth>]
+Usage: scanbus [--scan-begin=<addr>] [--scan-end=<addr>] [--probe-register=<addr>]
+               [--probe-amod=<amod>] [--probe-datawidth=<datawidth>]
 
-    Scans the upper 16 bits of the VME address space for the presence of (mesytec) VME modules.
+    Scans the upper 16 bits of the VME address space for the presence of mesytec VME modules.
     Displays the hardware and firmware revisions of found modules and additionally the loaded
-    firmware type for MDPP-like modules.
+    firmware type for MDPP-style modules.
 
-options:
+Options:
     --scan-begin=<addr> (default=0x0000)
         16-bit start address for the scan.
 
@@ -297,63 +299,19 @@ options:
     .exec = scanbus_command,
 };
 
-std::error_code dump_memory(
-    MVLC &mvlc,
-    u32 vmeAddress,
-    unsigned area,
-    u32 memAddress,
-    unsigned section,
-    size_t len,
-    std::vector<u8> &dest)
-{
-    static const size_t ChunkSize = mesytec::mvp::constants::page_size;
-
-    dest.reserve(len);
-    u32 addr = memAddress;
-    size_t remaining = len;
-
-    if (auto ec = enable_flash_interface(mvlc, vmeAddress))
-        return ec;
-
-    if (auto ec = set_verbose_mode(mvlc, vmeAddress, false))
-        return ec;
-
-    if (auto ec = set_area_index(mvlc, vmeAddress, area))
-        return ec;
-
-    while (remaining)
-    {
-        auto rl = std::min(ChunkSize, remaining);
-        std::vector<u8> pageBuffer;
-
-        if (auto ec = read_page(mvlc, vmeAddress, flash_address_from_byte_offset(addr),
-            section, rl, pageBuffer))
-        {
-            return ec;
-        }
-
-        std::copy(std::begin(pageBuffer), std::end(pageBuffer), std::back_inserter(dest));
-
-        remaining -= rl;
-        addr += rl;
-    }
-
-    return {};
-}
-
 DEF_EXEC_FUNC(dump_memory_command)
 {
     (void) self; (void) argc; (void) argv;
     spdlog::trace("entered dump_memory_command()");
     u32 vmeAddress = 0x0u;
     unsigned area = 0;
-    unsigned memAddress = 0;
     unsigned section = 0;
+    unsigned memAddress = 0;
     size_t len = mesytec::mvp::constants::page_size;
     std::string str;
 
     auto parser = ctx.parser;
-    parser.add_params({"--vme-address", "--area", "--mem-address", "--section", "--len"});
+    parser.add_params({"--vme-address", "--area", "--section", "--mem-address", "--len"});
     parser.parse(argv);
     trace_log_parser_info(parser, "dump_memory_command");
 
@@ -363,10 +321,10 @@ DEF_EXEC_FUNC(dump_memory_command)
     if (!parse_into(parser, "--area", area, convert_to_unsigned))
         return 1;
 
-    if (!parse_into(parser, "--mem-address", memAddress, convert_to_unsigned))
+    if (!parse_into(parser, "--section", section, convert_to_unsigned))
         return 1;
 
-    if (!parse_into(parser, "--section", section, convert_to_unsigned))
+    if (!parse_into(parser, "--mem-address", memAddress, convert_to_unsigned))
         return 1;
 
     if (!parse_into(parser, "--len", len, convert_to_unsigned))
@@ -382,7 +340,7 @@ DEF_EXEC_FUNC(dump_memory_command)
 
     std::vector<u8> memDest;
 
-    if (auto ec = dump_memory(mvlc, vmeAddress, area, memAddress, section, len, memDest))
+    if (auto ec = read_flash_memory(mvlc, vmeAddress, area, memAddress, section, len, memDest))
     {
         std::cout << fmt::format("Error reading flash memory from vme address 0x{:08x}: {}\n",
             vmeAddress, ec.message());
@@ -398,6 +356,26 @@ static const Command DumpMemoryCommand
 {
     .name = "dump-memory",
     .help = unindent(R"~(
+Usage: dump-memory --vme-address=<addr> --area=<area_index> --setion=<sec> --mem-address=<mem_addr> --len=<len>
+
+    Dumps the specified flash memory range to stdout.
+
+Options:
+    --vme-address=<addr> (default=0x0)
+        32-bit VME address of the target device
+
+    --area=<area_index> (default=0)
+        Flash area index to read from. Valid values in [0, 3]
+
+    --section=<sec> (default=0)
+        Flash section to read from. Valid values in [0, 3] and [8, 12]
+
+    --mem-address=addr> (default=0)
+        24-bit flash address to start reading from.
+
+    --len=<len> (default=256)
+        Length in bytes to read.
+
 )~"),
     .exec = dump_memory_command,
 };
@@ -473,7 +451,7 @@ DEF_EXEC_FUNC(write_firmware_command)
         int maxProgress = 0u;
 
         QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_range_changed, [&maxProgress] (int min, int max) {
-            std::cout << fmt::format("FlashInterface::progressRange: [{}, {}]\n", min, max);
+            //std::cout << fmt::format("FlashInterface::progressRange: [{}, {}]\n", min, max);
             maxProgress = max;
         });
 
@@ -507,6 +485,21 @@ static const Command WriteFirmwareCommand
 {
     .name = "write-firmware",
     .help = unindent(R"~(
+Usage: write-firmware --firmware=<file|dir> [--vme-address=<addr>] [--area=<area>]
+
+    Writes the given MVP firmware package/file to the specified destination device and area.
+
+Options:
+    --firmware=<file|dir>
+        Path to the input file or directory. Usually a *.mvp file but can also be single *.bin or *.hex files.
+
+    --vme-address=<addr>
+        32-bit VME address of the target device. Must be an MDPP-style device supporting the MVP protocol.
+
+    --area=<area>
+        Flash area to write the firmware to. Not needed if a *.mvp package is
+        used as these usually contain the target area encoded in the contained filenames.
+
 )~"),
     .exec = write_firmware_command,
 };
@@ -541,12 +534,14 @@ DEF_EXEC_FUNC(boot_module_command)
     {
         MvlcMvpFlash flash(mvlc, vmeAddress);
         flash.boot(area);
-        std::cout << fmt::format("Booted VME module 0x{:08x} into firmware area {}\n", vmeAddress, area);
     } catch (const std::exception &e)
     {
-        std::cerr << fmt::format("Error sending 'boot' command to VME address 0x{:08x}: {}\n", vmeAddress, e.what());
-        return 1;
+        // Note: ignoring errors here as the module immediately boots without
+        // sending a response.  Side effect is that VME-level errors from the
+        // MVLC like 'No VME Response' are also suppressed :(
     }
+
+    std::cout << fmt::format("Sent boot command to VME module 0x{:08x} (area={})\n", vmeAddress, area);
 
     return 0;
 }
@@ -555,6 +550,16 @@ static const Command BootModuleCommand
 {
     .name = "boot-module",
     .help = unindent(R"~(
+Usage: boot-module --vme-address=<addr> --area=<area>
+
+    Boot the target module into the specified flash area.
+
+Options:
+    --vme-address=<addr> (default=0x0)
+        32-bit VME address of the target device. Must be an MDPP-style device supporting the MVP protocol.
+
+    --area=<area> (default=0)
+        Flash area to boot into. Range [0,3].
 )~"),
     .exec = boot_module_command,
 };
@@ -566,12 +571,52 @@ inline Command make_command(const std::string &name)
     return ret;
 }
 
+static const std::string GeneralHelp = unindent(R"~(
+Usage: mvlc_mvp_updater [-v | --version] [-h | --help [-a]] [--log-level=(off|error|warn|info|debug|trace)]
+                        [--mvlc <url> | --mvlc-usb | --mvlc-usb-index <index> |
+                         --mvlc-usb-serial <serial> | --mvlc-eth <hostname>]
+                        <command> [<args>]
+
+Core Commands:
+    help <command>
+        Show help for the given command and exit.
+
+    list-commands | help -a
+        Print list of available commands.
+
+Core Switches:
+    -v | --version
+        Show mvlc-cli and mesytec-mvlc versions and exit.
+
+    -h <command> | --help <command>
+        Show help for the given command and exit.
+
+    -h -a | --help -a
+        Same as list-commands: print a list of available commands.
+
+MVLC connection URIs:
+
+    mvlc-cli supports the following URI schemes with --mvlc <uri> to connect to MVLCs:
+        usb://                   Use the first USB device
+        usb://<serial-string>    USB device matching the given serial number
+        usb://@<index>           USB device with the given logical FTDI driver index
+        eth://<hostname|ip>      ETH/UDP with a hostname or an ip-address
+        udp://<hostname|ip>      ETH/UDP with a hostname or an ip-address
+        hostname                 No scheme part -> interpreted as a hostname for ETH/UDP
+
+    Alternatively the transport specific options --mvlc-usb, --mvlc-usb-index,
+    --mvlc-usb-serial and --mvlc-eth may be used.
+
+    If none of the above is given MVLC_ADDRESS from the environment is used as
+    the MVLC URI. Use e.g. `export MVLC_ADDRESS=usb://` to connect to the first MVLC USB.
+)~");
+
 int main(int argc, char *argv[])
 {
     spdlog::set_level(spdlog::level::info);
     mesytec::mvlc::set_global_log_level(spdlog::level::info);
 
-    argh::parser parser({"-h", "--help", "--log-level", "--trace", "--debug"});
+    argh::parser parser({"-h", "--help", "--log-level"});
     add_mvlc_standard_params(parser);
     parser.parse(argv);
 
@@ -585,7 +630,15 @@ int main(int argc, char *argv[])
             logLevelName = "debug";
 
         if (!logLevelName.empty())
-            spdlog::set_level(spdlog::level::from_str(logLevelName));
+        {
+            auto level = spdlog::level::from_str(logLevelName);
+            if (level == spdlog::level::off)
+            {
+                std::cerr << fmt::format("Error: invalid spdlog level name '{}'.\n", logLevelName);
+                return 1;
+            }
+            spdlog::set_level(level);
+        }
     }
 
     CliContext ctx;
@@ -644,14 +697,14 @@ int main(int argc, char *argv[])
     {
         if (parser["-a"])
             return ListCmdsCommand.exec(ctx, ListCmdsCommand, argc, const_cast<const char **>(argv));
-        std::cout << "general help text goes here\n";
+        std::cout << GeneralHelp;
         return 0;
     }
 
     if (parser[{"-v", "--version"}])
     {
-        std::cout << "vme_firmware_updater - version 0.1\n";
-        std::cout << fmt::format("mesytec-mvlc - version {}\n", mesytec::mvlc::library_version());
+        std::cout << fmt::format("mvlc_mvp_updater - version {}\n", mesytec::mvp::library_version());
+        std::cout << fmt::format("mesytec-mvlc     - version {}\n", mesytec::mvlc::library_version());
         return 0;
     }
 
