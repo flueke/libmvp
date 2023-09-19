@@ -36,7 +36,10 @@ message("-- Using QUAZIP_QT5=${QUAZIP_QT5}")
 
 include_directories(${Boost_INCLUDE_DIRS} ${QUAZIP_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
+configure_file("git_version.cc.in" "git_version.cc" @ONLY)
+
 add_library(libmvp
+    "${CMAKE_CURRENT_BINARY_DIR}/git_version.cc"
     file_dialog.cc
     firmware.cc
     firmware_ops.cc
