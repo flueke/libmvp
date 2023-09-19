@@ -139,9 +139,9 @@ if (LIBMVP_BUILD_DEV_TOOLS)
         PRIVATE spdlog::spdlog)
 
     # flashing mdpp/vmmr/mvlc modules through vme
-    add_executable(vme_firmware_updater vme_firmware_updater.cc)
-    target_link_libraries(vme_firmware_updater PRIVATE libmvp argh)
-    install(TARGETS vme_firmware_updater RUNTIME DESTINATION bin LIBRARY DESTINATION lib)
+    add_executable(mvlc-mvp-updater mvlc_mvp_updater.cc)
+    target_link_libraries(mvlc-mvp-updater PRIVATE libmvp argh)
+    install(TARGETS mvlc-mvp-updater RUNTIME DESTINATION bin LIBRARY DESTINATION lib)
 
 endif(LIBMVP_BUILD_DEV_TOOLS)
 
