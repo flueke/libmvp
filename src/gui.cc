@@ -680,16 +680,6 @@ void MVPLabGui::on_actionAbout_triggered()
         layout->addWidget(label);
     }
 
-    {
-        QString text = QString("%1 - %2").arg(appName).arg(appVersion);
-        auto label = new QLabel;
-        auto font = label->font();
-        font.setPointSize(15);
-        font.setBold(true);
-        label->setFont(font);
-        layout->addWidget(label);
-    }
-
     layout->addWidget(new QLabel(appDisplayName));
     layout->addWidget(new QLabel(QString("Version %1").arg(appVersion)));
     layout->addWidget(new QLabel(QSL("© 2015-2023 mesytec GmbH & Co. KG")));
