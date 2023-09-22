@@ -11,6 +11,12 @@ namespace mesytec::mvp
 
 using namespace mesytec::mvlc;
 
+// After writing to the MVP input FIFO some time needs to pass for the data to
+// be processed. Only then does the output FIFO contain valid data and status
+// flags. This constant is the number of cycles the command stack waits before
+// continuing. Value 1000 ^= 12.5 us.
+static const unsigned PostFifoWriteStackWaitCycles = 100000;
+
 std::error_code enable_flash_interface(MVLC &mvlc, u32 moduleBase)
 {
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
@@ -242,6 +248,9 @@ std::error_code set_verbose_mode(MVLC &mvlc, u32 moduleBase, bool verbose)
     return command_transaction(mvlc, moduleBase, instr, resp);
 }
 
+// Extracts the low bytes from the 32-bit words in the stack response. Takes
+// care of stack continuations. Stops once output_fifo_flags::InvalidRead is
+// set.
 void fill_page_buffer_from_stack_output(std::vector<u8> &pageBuffer, const std::vector<u32> stackOutput)
 {
     assert(stackOutput.size() > 3);
@@ -316,7 +325,7 @@ std::error_code read_page(
 
     // Waiting is required, otherwise the response data will start with the
     // InvalidRead flag set.
-    sb.addWait(100000);
+    sb.addWait(PostFifoWriteStackWaitCycles);
     // Turn the next vme read into a fake block read. Read one more word than
     // expected to get the first flash interface status word after the payload.
     sb.addSetAccu(bytesToRead + 1);
@@ -553,7 +562,7 @@ std::error_code write_page3(
     for (auto dataWord: pageBuffer)
         sb.addVMEWrite(moduleBase + InputFifoRegister, dataWord, vme_amods::A32, VMEDataWidth::D16);
 
-    sb.addWait(100000); // wait for a couple of cycles before returning from the stack
+    sb.addWait(PostFifoWriteStackWaitCycles); // wait for a couple of cycles before returning from the stack
 
     logger->debug("write_page3(): performing stackTransaction: pageSize={} bytes, stackCommands={}"
                  ", encodedStackSize={} words",
@@ -641,11 +650,11 @@ std::error_code write_page4(
     #endif
 
     static const std::vector<u8> EfwRequest = { mesytec::mvp::opcodes::EFW, 0xCD, 0xAB };
-    static const unsigned ExpectedFlashResponseSize = 5;
+    static const unsigned ExpectedFlashResponseSize = 5; // Efw is 3 + 0xff + statusbyte
     static const u32 StackReferenceMarker = 0x13370001u;
-    // Response structure: 0xF3 stack frame header, reference marker word, data
-    // words from vme reads.
-    static const unsigned ExpectedStackResponseSize = 2 + ExpectedFlashResponseSize;
+    // Response structure: 0xF3 stack frame header, reference marker word, 0xF5
+    // block frame, data words from vme reads.
+    static const unsigned ExpectedStackResponseSize = 3 + ExpectedFlashResponseSize;
 
 
     StackCommandBuilder sb;
@@ -673,15 +682,16 @@ std::error_code write_page4(
     // is 24 bit). Without the wait the output fifo will be in an invalid state
     // as the commands from the input fifo are still being processed by the
     // flash interface.
-    sb.addWait(100000);
+    sb.addWait(PostFifoWriteStackWaitCycles);
 
     // Accu loop: read the statusregister until it's 0, meaning "flash output fifo not empty".
     sb.addReadToAccu(moduleBase + StatusRegister, vme_amods::A32, VMEDataWidth::D16);
     sb.addCompareLoopAccu(AccuComparator::EQ, 0);
 
-    // Now read the flash response from the flash output fifo.
-    for (unsigned i=0; i<ExpectedFlashResponseSize; ++i)
-        sb.addVMERead(moduleBase + OutputFifoRegister, vme_amods::A32, VMEDataWidth::D16);
+    // Now read the flash response from the flash output fifo. setAccu turns the
+    // read into a fake block read.
+    sb.addSetAccu(ExpectedFlashResponseSize+1);
+    sb.addVMERead(moduleBase + OutputFifoRegister, vme_amods::A32, VMEDataWidth::D16);
 
     logger->debug("write_page4(): performing stackTransaction: pageSize={} bytes, stackCommands={}"
                   ", encodedStackSize={} words",
@@ -698,11 +708,12 @@ std::error_code write_page4(
     logger->debug("write_page4(): response from stackTransaction: size={}, data={:#08x}",
                     stackResponse.size(), fmt::join(stackResponse, ", "));
 
-    if (stackResponse.size() != ExpectedStackResponseSize)
+    if (stackResponse.size() != ExpectedStackResponseSize+1)
     {
-        logger->error("write_page4(): stack response too short! got {} words, expected {} words",
+        logger->warn("write_page4(): unexpected stack response size! got {} words, expected {} words",
             stackResponse.size(), ExpectedStackResponseSize);
-        return make_error_code(std::errc::protocol_error);
+        // FIXME
+        //return make_error_code(std::errc::protocol_error);
     }
 
     if (extract_frame_info(stackResponse[0]).flags & frame_flags::AllErrorFlags)
@@ -723,7 +734,8 @@ std::error_code write_page4(
     }
 
     std::vector<u8> flashResponse;
-    std::copy(std::begin(stackResponse) + 2, std::end(stackResponse), std::back_inserter(flashResponse));
+    fill_page_buffer_from_stack_output(flashResponse, stackResponse);
+    //std::copy(std::begin(stackResponse) + 2, std::end(stackResponse), std::back_inserter(flashResponse));
 
     if (!check_response(EfwRequest, flashResponse))
     {
@@ -812,7 +824,7 @@ std::error_code write_pages(
         // is 24 bit). Without the wait the output fifo will be in an invalid state
         // as the commands from the input fifo are still being processed by the
         // flash interface.
-        sb.addWait(100000);
+        sb.addWait(PostFifoWriteStackWaitCycles);
 
         // Accu loop: read the statusregister until it's 0, meaning "flash output fifo not empty".
         sb.addReadToAccu(moduleBase + StatusRegister, vme_amods::A32, VMEDataWidth::D16);

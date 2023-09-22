@@ -93,7 +93,8 @@ std::error_code read_page(
     const FlashAddress &addr, u8 section, unsigned bytesToRead,
     std::vector<u8> &pageBuffer);
 
-// Write a full page or less using single vme write commands.
+// Write a full page or less using single vme write commands. Very slow as there
+// is lots of ping-pong going on.
 std::error_code write_page(
     MVLC &mvlc, u32 moduleBase,
     const FlashAddress &addr, u8 section,
