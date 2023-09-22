@@ -9,11 +9,11 @@
 #include <QSerialPortInfo>
 #include <QTabWidget>
 
-#include <serial_port_flash.h>
-#include <mvlc_mvp_flash.h>
-#include <serial_port_mvp_connector.h>
-#include <mvlc_mvp_connector.h>
 #include <firmware_selection_widget.h>
+#include <mvlc_mvp_connector.h>
+#include <mvlc_mvp_flash.h>
+#include <serial_port_flash.h>
+#include <serial_port_mvp_connector.h>
 
 #include "flash.h"
 #include "port_helper.h"
@@ -24,6 +24,7 @@ class QCheckBox;
 class QCloseEvent;
 class QGroupBox;
 class QSerialPort;
+class QTextBrowser;
 
 namespace Ui
 {
@@ -48,6 +49,7 @@ class MVPLabGui: public QMainWindow
     virtual ~MVPLabGui();
 
     QAction *getToggleAdvancedAction();
+    QTextBrowser *getLogview();
 
   protected:
     virtual void closeEvent(QCloseEvent *event) override;

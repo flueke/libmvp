@@ -282,6 +282,11 @@ QAction *MVPLabGui::getToggleAdvancedAction()
   return ui->actionShowAdvanced;
 }
 
+QTextBrowser *MVPLabGui::getLogview()
+{
+  return ui->logview;
+}
+
 void MVPLabGui::_on_start_button_clicked()
 {
   write_firmware();
