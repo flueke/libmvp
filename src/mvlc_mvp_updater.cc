@@ -572,6 +572,11 @@ inline Command make_command(const std::string &name)
 }
 
 static const std::string GeneralHelp = unindent(R"~(
+Command line mesytec (VME) firmware updater - MVLC VME version.
+
+Uses the mesytec MVLC VME controller to issue firmware update and related
+commands to mesytec MDPP-style VME modules.
+
 Usage: mvlc_mvp_updater [-v | --version] [-h | --help [-a]] [--log-level=(off|error|warn|info|debug|trace)]
                         [--mvlc <url> | --mvlc-usb | --mvlc-usb-index <index> |
                          --mvlc-usb-serial <serial> | --mvlc-eth <hostname>]
@@ -586,7 +591,7 @@ Core Commands:
 
 Core Switches:
     -v | --version
-        Show mvlc-cli and mesytec-mvlc versions and exit.
+        Show mvlc-cli and mesytec-mvlc versions.
 
     -h <command> | --help <command>
         Show help for the given command and exit.
@@ -608,7 +613,8 @@ MVLC connection URIs:
     --mvlc-usb-serial and --mvlc-eth may be used.
 
     If none of the above is given MVLC_ADDRESS from the environment is used as
-    the MVLC URI. Use e.g. `export MVLC_ADDRESS=usb://` to connect to the first MVLC USB.
+    the MVLC URI. Use e.g. `export MVLC_ADDRESS=usb://` to connect to the first
+    MVLC USB device.
 )~");
 
 int main(int argc, char *argv[])
@@ -632,7 +638,7 @@ int main(int argc, char *argv[])
         if (!logLevelName.empty())
         {
             auto level = spdlog::level::from_str(logLevelName);
-            if (level == spdlog::level::off)
+            if (level == spdlog::level::off && logLevelName != "off")
             {
                 std::cerr << fmt::format("Error: invalid spdlog level name '{}'.\n", logLevelName);
                 return 1;
