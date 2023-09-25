@@ -390,6 +390,7 @@ DEF_EXEC_FUNC(write_firmware_command)
     u32 vmeAddress = 0;
     unsigned area = 0;
     std::string firmwareInput;
+    bool doErase = true;
 
     auto parser = ctx.parser;
     parser.add_params({"--vme-address", "--area", "--firmware"});
@@ -407,6 +408,9 @@ DEF_EXEC_FUNC(write_firmware_command)
         std::cerr << "Error: missing --firmware <file|dir> parameter!\n";
         return 1;
     }
+
+    if (parser["--no-erase"])
+        doErase = false;
 
     mesytec::mvp::FirmwareArchive firmware;
     namespace fs = std::filesystem;
@@ -448,6 +452,7 @@ DEF_EXEC_FUNC(write_firmware_command)
     {
         MvlcMvpFlash flash(mvlc, vmeAddress);
         mesytec::mvp::FirmwareWriter writer(firmware, &flash);
+        writer.set_do_erase(doErase);
         int maxProgress = 0u;
 
         QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_range_changed, [&maxProgress] (int min, int max) {
@@ -499,6 +504,9 @@ Options:
     --area=<area>
         Flash area to write the firmware to. Not needed if a *.mvp package is
         used as these usually contain the target area encoded in the contained filenames.
+
+    --no-erase
+        If specified the target flash sections will not be erased prior to writing.
 
 )~"),
     .exec = write_firmware_command,
