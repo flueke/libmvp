@@ -270,6 +270,10 @@ MVPLabGui::MVPLabGui(QWidget *parent)
 
   connect(m_advancedwidget, SIGNAL(sig_mdpp32_cal_save_to_file(const QString &)),
       this, SLOT(adv_mdpp32_cal_save_to_file(const QString &)));
+
+  QSettings settings;
+  restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
+  restoreState(settings.value("mainWindowState").toByteArray());
 }
 
 MVPLabGui::~MVPLabGui()
@@ -614,6 +618,10 @@ void MVPLabGui::closeEvent(QCloseEvent *event)
     m_quit = true;
     event->ignore();
   }
+
+  QSettings settings;
+  settings.setValue("mainWindowGeometry", saveGeometry());
+  settings.setValue("mainWindowState", saveState());
 }
 
 void MVPLabGui::append_to_log(const QString &s)
