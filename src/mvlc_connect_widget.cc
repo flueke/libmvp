@@ -244,7 +244,7 @@ void MvlcConnectWidget::setScanbusResult(const QVariantList &scanbusResult)
     dlg.setWindowTitle("Scanbus Results");
     dlg.setWindowIcon(QIcon(":/window-icon.png"));
     auto dlgLayout = new QVBoxLayout(&dlg);
-    auto explanation = new QLabel("Double click a line to use the address as the VME Target Device address");
+    auto explanation = new QLabel("Double click a line to use the module address as the VME target device address.");
     explanation->setWordWrap(true);
     dlgLayout->addWidget(explanation);
     dlgLayout->addWidget(table);
