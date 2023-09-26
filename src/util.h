@@ -3,11 +3,11 @@
 
 #include <QException>
 #include <QFuture>
+#include <QObject>
+#include <QSerialPort>
 #include <QtConcurrent>
 #include <QtDebug>
-#include <QSerialPort>
 #include <QTextStream>
-#include <QObject>
 
 #include <exception>
 #include <functional>
@@ -184,18 +184,6 @@ QVector<T> span_to_qvector(const gsl::span<T> &span_)
   return ret;
 }
 
-} // ns mvp
-} // ns mesytec
-
-template <typename U>
-QString format_bytes(const U &bytes)
-{
-  QString ret;
-  QTextStream stream(&ret);
-  format_bytes(stream, bytes);
-  return ret;
-}
-
 template <typename T, typename U>
 T &format_bytes(T &stream, const U &bytes)
 {
@@ -213,5 +201,17 @@ T &format_bytes(T &stream, const U &bytes)
   }
   return stream;
 }
+
+template <typename U>
+QString format_bytes(const U &bytes)
+{
+  QString ret;
+  QTextStream stream(&ret);
+  format_bytes(stream, bytes);
+  return ret;
+}
+
+} // ns mvp
+} // ns mesytec
 
 #endif
