@@ -291,9 +291,8 @@ void fill_page_buffer_from_stack_output(std::vector<u8> &pageBuffer, const std::
 
     if (!view.empty())
     {
-        logger->warn("fill_page_buffer_from_stack_output: {} words left in stackOutput data", view.size());
-        log_buffer(std::cout, view);
-        logger->warn("fill_page_buffer_from_stack_output: end of {} words left in stackOutput data", view.size());
+        log_buffer(logger, spdlog::level::warn, view,
+            fmt::format("fill_page_buffer_from_stack_output: {} words left in stackOutput data", view.size()));
     }
 }
 
