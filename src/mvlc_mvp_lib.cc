@@ -211,7 +211,19 @@ bool check_response(const std::vector<u8> &request,
         return false;
     }
 
-    if (!std::equal(std::begin(request), std::end(request), std::begin(response)))
+    // Workaround for MVLC flash interface issues: sometimes the response starts
+    // with an additional byte of data, probably related to the current or last
+    // fifo status byte. The code checks for this condition and ignores the byte
+    // in the response.
+    auto responseBegin = std::begin(response);
+
+    if (response[0] != request[0] && response[1] == request[0])
+    {
+        logger->warn("ignoring leading response byte in flash response");
+        ++responseBegin;
+    }
+
+    if (!std::equal(std::begin(request), std::end(request), responseBegin))
     {
         logger->warn("request contents != response contents");
         return false;
@@ -309,12 +321,9 @@ std::error_code read_page(
     // Note: the REF instruction does not mirror itself to the output fifo.
     // Instead the page data starts immediately.
 
-    //u8 len = static_cast<u8>(bytesToRead == PageSize ? 0 : bytesToRead);
-    //std::vector<u8> instr = { 0xB0, addr[0], addr[1], addr[2], section, len };
-
     StackCommandBuilder sb;
     sb.addWriteMarker(0x13370001u);
-    sb.addVMEWrite(moduleBase + InputFifoRegister, 0xB0, vme_amods::A32, VMEDataWidth::D16);
+    sb.addVMEWrite(moduleBase + InputFifoRegister, mesytec::mvp::opcodes::REF, vme_amods::A32, VMEDataWidth::D16);
     sb.addVMEWrite(moduleBase + InputFifoRegister, addr[0], vme_amods::A32, VMEDataWidth::D16);
     sb.addVMEWrite(moduleBase + InputFifoRegister, addr[1], vme_amods::A32, VMEDataWidth::D16);
     sb.addVMEWrite(moduleBase + InputFifoRegister, addr[2], vme_amods::A32, VMEDataWidth::D16);
