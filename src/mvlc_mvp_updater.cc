@@ -4,6 +4,7 @@
 #include <mvlc_mvp_lib.h>
 #include <mvlc_mvp_flash.h>
 #include <git_version.h>
+#include <QElapsedTimer>
 
 using namespace mesytec::mvlc;
 using namespace mesytec::mvp;
@@ -391,6 +392,7 @@ DEF_EXEC_FUNC(write_firmware_command)
     unsigned area = 0;
     std::string firmwareInput;
     bool doErase = true;
+    bool doVerify = false;
 
     auto parser = ctx.parser;
     parser.add_params({"--vme-address", "--area", "--firmware"});
@@ -411,6 +413,9 @@ DEF_EXEC_FUNC(write_firmware_command)
 
     if (parser["--no-erase"])
         doErase = false;
+
+    if (parser["--verify"])
+        doVerify = true;
 
     mesytec::mvp::FirmwareArchive firmware;
     namespace fs = std::filesystem;
@@ -453,29 +458,48 @@ DEF_EXEC_FUNC(write_firmware_command)
         MvlcMvpFlash flash(mvlc, vmeAddress);
         mesytec::mvp::FirmwareWriter writer(firmware, &flash);
         writer.set_do_erase(doErase);
-        int maxProgress = 0u;
+        writer.set_do_verify(doVerify);
+        int curProgress = 0;
+        int maxProgress = 0;
+        QString writerStatus;
+        QElapsedTimer reportTimer;
+        static int ReportInterval_ms = 500;
+
+        auto maybe_report = [&]
+        {
+            if (reportTimer.elapsed() >= ReportInterval_ms)
+            {
+                std::cout << fmt::format("write-firmware: {} (page {}/{})\n",
+                    writerStatus.toStdString(), curProgress, maxProgress);
+                reportTimer.start();
+            }
+        };
 
         QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_range_changed, [&maxProgress] (int min, int max) {
-            //std::cout << fmt::format("FlashInterface::progressRange: [{}, {}]\n", min, max);
             maxProgress = max;
         });
 
-        QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_changed, [&maxProgress] (int progress) {
-            std::cout << fmt::format("FlashInterface::progress: {}/{}\n", progress, maxProgress);
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_changed, [&] (int progress) {
+            //std::cout << fmt::format("FlashInterface::progress: {}/{}\n", progress, maxProgress);
+            curProgress = progress;
+            maybe_report();
         });
 
         QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_text_changed, [] (const QString &txt) {
-            std::cout << fmt::format("FlashInterface::progressText: {}\n", txt.toStdString());
+            std::cout << fmt::format("FlashInterface: {}\n", txt.toStdString());
         });
 
         QObject::connect(&flash, &mesytec::mvp::FlashInterface::statusbyte_received, [] (const u8 &status) {
-            std::cout << fmt::format("FlashInterface::statusbyte: 0x{:02x}\n", status);
+            //std::cout << fmt::format("FlashInterface::statusbyte: 0x{:02x}\n", status);
         });
 
-        QObject::connect(&writer, &mesytec::mvp::FirmwareWriter::status_message, [] (const QString &msg) {
-            std::cout << "FirmwareWriter status: " << msg.toStdString() << "\n";
+        QObject::connect(&writer, &mesytec::mvp::FirmwareWriter::status_message, [&] (const QString &msg) {
+            //std::cout << "FirmwareWriter status: " << msg.toStdString() << "\n";
+            writerStatus = msg;
+            maybe_report();
         });
 
+        reportTimer.start();
         writer.write();
     } catch (const std::exception &e)
     {
@@ -505,8 +529,13 @@ Options:
         Flash area to write the firmware to. Not needed if a *.mvp package is
         used as these usually contain the target area encoded in the contained filenames.
 
+    --verify
+        If present the flash contents will be verified after writing.
+
     --no-erase
-        If specified the target flash sections will not be erased prior to writing.
+        If specified the target flash sections will not be erased prior to
+        writing. Use for debugging/testing only!
+
 
 )~"),
     .exec = write_firmware_command,
