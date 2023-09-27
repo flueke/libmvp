@@ -87,19 +87,11 @@ MVPLabGui::MVPLabGui(QWidget *parent)
     });
 
   // mvlc interactions
-  connect(mvlcConnectWidget, &MvlcConnectWidget::mvlcChanged,
+  connect(mvlcConnectWidget, &MvlcConnectWidget::mvlcConnectInfoChanged,
     mvlcConnector_, &MvlcMvpConnector::setConnectInfo);
-
-  //connect(mvlcConnectWidget, &MvlcConnectWidget::mvlcChanged,
-  //  this, [this] (const QVariantMap &info) {
-  //    mvlcConnector_->setConnectInfo(info);
-  //  });
 
   connect(mvlcConnectWidget, &MvlcConnectWidget::usbRefreshRequested,
     mvlcConnector_, &MvlcMvpConnector::refreshUsbDevices);
-
-  connect(mvlcConnector_, &MvlcMvpConnector::usbDevicesChanged,
-    mvlcConnectWidget, &MvlcConnectWidget::setUsbDevices);
 
   connect(mvlcConnectWidget, &MvlcConnectWidget::connectMvlc,
     this, &MVPLabGui::mvlc_connect);
@@ -107,11 +99,17 @@ MVPLabGui::MVPLabGui(QWidget *parent)
   connect(mvlcConnectWidget, &MvlcConnectWidget::scanbusRequested,
     this, &MVPLabGui::mvlc_scanbus);
 
+  connect(mvlcConnector_, &MvlcMvpConnector::usbDevicesChanged,
+    mvlcConnectWidget, &MvlcConnectWidget::setUsbDevices);
+
   connect(mvlcConnector_, &MvlcMvpConnector::scanbusResultReady,
     mvlcConnectWidget, &MvlcConnectWidget::setScanbusResult);
 
   connect(mvlcConnector_, &MvlcMvpConnector::logMessage,
     this, &MVPLabGui::append_to_log);
+
+  connect(mvlcConnector_, &MvlcMvpConnector::connectedToMVLC,
+    mvlcConnectWidget, &MvlcConnectWidget::mvlcSuccessfullyConnected);
 
   // firmware selection
   auto gb_fwSelect = new QGroupBox("Firmware Programming");
@@ -562,7 +560,7 @@ void MVPLabGui::mvlc_connect()
     run_in_thread_wait_in_loop([&] {
       mvlcConnector_->open();
     }, m_object_holder, m_fw);
-    append_to_log("Connected to MVLC"); // TODO: somehow get connection info and display it
+    //append_to_log("Connected to MVLC"); // TODO: somehow get connection info and display it
   } catch (const std::exception &e) {
     append_to_log(QString(e.what()));
     return;
@@ -631,7 +629,7 @@ void MVPLabGui::append_to_log(const QString &s)
       .arg(s));
 
   ui->logview->append(str);
-  qDebug() << s;
+  //qDebug() << s;
 }
 
 void MVPLabGui::handle_future_started()
@@ -1001,7 +999,7 @@ void MVPLabGui::adv_keys_info()
     auto devName = otp.get_device();
     devName.replace(' ', "&nbsp;");
 
-    append_to_log(QString("Device Info: OTP(dev='<b>%1</b>', serial=<b>%2</b>")
+    append_to_log(QString("Device Info: OTP(dev='<b>%1</b>', serial=<b>%2</b>)")
                   .arg(devName)
                   .arg(otp.get_sn(), 8, 16, QLatin1Char('0'))
                  );

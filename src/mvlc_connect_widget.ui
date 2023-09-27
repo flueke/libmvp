@@ -123,6 +123,11 @@
          <property name="editable">
           <bool>true</bool>
          </property>
+         <item>
+          <property name="text">
+           <string>mvlc-0042</string>
+          </property>
+         </item>
         </widget>
        </item>
        <item>

@@ -48,11 +48,13 @@ void MvlcMvpConnector::open()
     if (auto ec = d->mvlc_.connect())
         throw std::system_error(ec);
 
+    emit connectedToMVLC(m);
+
     bool addrOk = false;
     auto vmeAddress = m["vme_address"].toString().toUInt(&addrOk, 0);
 
     if (!addrOk)
-        throw std::runtime_error("MvlcMvpConnector error: could not parse connectionInfo map");
+        throw std::runtime_error("MvlcMvpConnector error: could not parse target VME address");
 
     d->flash_->setMvlc(d->mvlc_);
     d->flash_->setVmeAddress(vmeAddress);
@@ -60,6 +62,7 @@ void MvlcMvpConnector::open()
 
 void MvlcMvpConnector::close()
 {
+    d->flash_->maybe_disable_flash_interface();
     if (d->mvlc_)
         d->mvlc_.disconnect();
     d->mvlc_ = mvlc::MVLC();
@@ -96,7 +99,8 @@ void MvlcMvpConnector::refreshUsbDevices()
 QVariantList MvlcMvpConnector::scanbus()
 {
     open();
-    auto candidates = mvlc::scanbus::scan_vme_bus_for_candidates(d->mvlc_);
+    auto candidates = mvlc::scanbus::scan_vme_bus_for_candidates_stacksize(
+        d->mvlc_, mvlc::stacks::StackMemoryWords);
     QVariantList result;
 
     for (auto &addr: candidates)

@@ -13,6 +13,9 @@ class MvlcMvpConnector: public MvpConnectorInterface
         void scanbusResultReady(const QVariantList &scanbusResult);
         void usbDevicesChanged(const QVariantList &deviceInfos);
         void logMessage(const QString &msg);
+        // Emitted if successfully connected to the MVLC specified by the
+        // mvlcInfo map.
+        void connectedToMVLC(const QVariantMap &mvlcInfo);
 
     public:
         MvlcMvpConnector(QObject *parent = nullptr);

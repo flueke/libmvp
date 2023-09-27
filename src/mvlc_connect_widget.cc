@@ -72,6 +72,8 @@ struct MvlcConnectWidget::Private
     Ui::MvlcConnectWidget ui_;
     bool isConnected_ = false;
     QVariantList prevUsbDevices_;
+    // Stores connection info for each successfully connected MVLC.
+    std::vector<QVariantMap> connectHistory_;
 
     bool isEth() const
     {
@@ -118,6 +120,8 @@ MvlcConnectWidget::MvlcConnectWidget(QWidget *parent)
         this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
     connect(d->ui_.combo_eth, qOverload<int>(&QComboBox::currentIndexChanged),
         this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
+    connect(d->ui_.combo_eth, qOverload<int>(&QComboBox::activated),
+        this, &MvlcConnectWidget::onConnectButtonClicked);
 
     connect(d->ui_.combo_usb, qOverload<int>(&QComboBox::currentIndexChanged),
         this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
@@ -131,24 +135,22 @@ MvlcConnectWidget::MvlcConnectWidget(QWidget *parent)
     // connection info.
     connect(d->ui_.tabs_connectMethod, &QTabWidget::currentChanged,
         this, &MvlcConnectWidget::onConnectInfoChangedInWidget);
+
+    if (auto ethInfos = load_eth_history(); !ethInfos.empty())
+    {
+        d->ui_.combo_eth->clear();
+        for (const auto &info: ethInfos)
+        {
+            d->ui_.combo_eth->addItem(info["address"].toString());
+            d->connectHistory_.push_back(info);
+        }
+    }
 }
 
 MvlcConnectWidget::~MvlcConnectWidget()
 {
+    store_eth_history(d->connectHistory_);
 }
-
-#if 0
-void MvlcConnectWidget::setIsConnected(bool isConnected)
-{
-    if (auto pb = d->activeConnectButton())
-    {
-        if (isConnected)
-            pb->setText("Disconnect");
-        else
-            pb->setText("Connect");
-    }
-}
-#endif
 
 QVariantMap MvlcConnectWidget::getConnectInfo()
 {
@@ -191,10 +193,6 @@ void MvlcConnectWidget::setConnectInfo(const QVariantMap &info)
 
 void MvlcConnectWidget::setScanbusResult(const QVariantList &scanbusResult)
 {
-    // TODO: show a list of found vme devices.
-    // allow the user to double click a device to select
-    // on device selection update the vme target address box
-
     const QStringList headerLabels =
     {
         "Address",
@@ -204,7 +202,7 @@ void MvlcConnectWidget::setScanbusResult(const QVariantList &scanbusResult)
         "Firmware Type"
     };
 
-    auto table = new QTableWidget(this);
+    auto table = new QTableWidget;
     table->setRowCount(scanbusResult.size());
     table->setColumnCount(headerLabels.size());
     table->setHorizontalHeaderLabels(headerLabels);
@@ -310,8 +308,6 @@ void MvlcConnectWidget::setUsbDevices(const QVariantList &usbDevices)
                 break;
             }
         }
-        //idx = combo->findData(currentInfo);
-        //idx = idx >= 0 ? idx : 0;
     }
 
     combo->setCurrentIndex(idx);
@@ -320,7 +316,17 @@ void MvlcConnectWidget::setUsbDevices(const QVariantList &usbDevices)
     // Note: USB might not be the currently active connection method but it's
     // easier to just emit the signal anyways. getConnectInfo() will correctly
     // determine the active connection method and return the correct info.
-    emit mvlcChanged(getConnectInfo());
+    emit mvlcConnectInfoChanged(getConnectInfo());
+}
+
+void MvlcConnectWidget::mvlcSuccessfullyConnected(const QVariantMap &info)
+{
+    auto it = std::remove_if(
+        std::begin(d->connectHistory_), std::end(d->connectHistory_),
+        [&info] (const auto &entry) { return entry["address"] == info["address"]; });
+
+    d->connectHistory_.erase(it, std::end(d->connectHistory_));
+    d->connectHistory_.push_back(info);
 }
 
 void MvlcConnectWidget::onConnectButtonClicked()
@@ -330,8 +336,8 @@ void MvlcConnectWidget::onConnectButtonClicked()
 
 void MvlcConnectWidget::onConnectInfoChangedInWidget()
 {
-    //qDebug() << __PRETTY_FUNCTION__ << "connectInfo=" << getConnectInfo();
-    emit mvlcChanged(getConnectInfo());
+    qDebug() << __PRETTY_FUNCTION__ << "connectInfo=" << getConnectInfo();
+    emit mvlcConnectInfoChanged(getConnectInfo());
 }
 
 QString get_mvlc_connect_info_title(const QVariantMap &info)
