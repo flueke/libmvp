@@ -9,8 +9,7 @@ namespace mesytec::mvp
 
 MvlcMvpFlash::~MvlcMvpFlash()
 {
-    if (isFlashEnabled_)
-        disable_flash_interface(mvlc_, vmeAddress_);
+    maybe_disable_flash_interface();
 }
 
 void MvlcMvpFlash::setMvlc(MVLC &mvlc)
@@ -27,8 +26,8 @@ MVLC MvlcMvpFlash::getMvlc() const
 
 void MvlcMvpFlash::setVmeAddress(u32 vmeAddress)
 {
+    maybe_disable_flash_interface();
     vmeAddress_ = vmeAddress;
-    isFlashEnabled_ = false;
     m_write_enabled = false;
 }
 
@@ -44,6 +43,20 @@ void MvlcMvpFlash::maybe_enable_flash_interface()
         if (auto ec = enable_flash_interface(mvlc_, vmeAddress_))
             throw std::system_error(ec);
         isFlashEnabled_ = true;
+    }
+}
+
+void MvlcMvpFlash::maybe_disable_flash_interface()
+{
+    if (isFlashEnabled_)
+    {
+        if (auto ec = disable_flash_interface(mvlc_, vmeAddress_))
+        {
+            auto msg = QSL("Warning: could not disable flash interface on 0x%1.")
+                .arg(vmeAddress_, 8, 16, QLatin1Char('0'));
+            emit progress_text_changed(msg);
+        }
+        isFlashEnabled_ = false;
     }
 }
 

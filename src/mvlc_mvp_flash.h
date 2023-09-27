@@ -14,8 +14,6 @@ class MvlcMvpFlash: public mesytec::mvp::FlashInterface
 {
     Q_OBJECT
     public:
-        //using constants = ::mesytec::mvp::constants;
-
         MvlcMvpFlash(QObject *parent = nullptr)
             : FlashInterface(parent)
         {}
@@ -34,6 +32,7 @@ class MvlcMvpFlash: public mesytec::mvp::FlashInterface
         mvlc::u32 getVmeAddress() const;
 
         void maybe_enable_flash_interface();
+        void maybe_disable_flash_interface();
 
         void write_instruction(const gsl::span<uchar> data,
           int timeout_ms = constants::default_timeout_ms) override;
