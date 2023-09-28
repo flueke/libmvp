@@ -105,8 +105,7 @@ void MvlcMvpConnector::refreshUsbDevices()
 QVariantList MvlcMvpConnector::scanbus()
 {
     open();
-    auto candidates = mvlc::scanbus::scan_vme_bus_for_candidates_stacksize(
-        d->mvlc_, mvlc::stacks::StackMemoryWords);
+    auto candidates = mvlc::scanbus::scan_vme_bus_for_candidates(d->mvlc_);
     QVariantList result;
 
     for (auto &addr: candidates)
