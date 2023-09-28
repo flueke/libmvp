@@ -2,7 +2,6 @@
 #include "ui_mvlc_connect_widget.h"
 
 #include <mesytec-mvlc/mvlc_impl_usb.h>
-#include <QDebug>
 #include <QDialog>
 #include <QHeaderView>
 #include <QSettings>
@@ -282,8 +281,6 @@ void MvlcConnectWidget::setUsbDevices(const QVariantList &usbDevices)
     auto &combo = d->ui_.combo_usb;
 
     const auto currentInfo = combo->currentData().toMap();
-    //qDebug() << __PRETTY_FUNCTION__ << "currentInfo" << currentInfo;
-    //qDebug() << __PRETTY_FUNCTION__ << "usbDevices" << usbDevices;
 
     QSignalBlocker b(combo);
 
@@ -336,7 +333,6 @@ void MvlcConnectWidget::onConnectButtonClicked()
 
 void MvlcConnectWidget::onConnectInfoChangedInWidget()
 {
-    qDebug() << __PRETTY_FUNCTION__ << "connectInfo=" << getConnectInfo();
     emit mvlcConnectInfoChanged(getConnectInfo());
 }
 

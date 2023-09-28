@@ -1,6 +1,7 @@
 #include "flash.h"
 #include <boost/endian/conversion.hpp>
 #include <boost/format.hpp>
+#include <mesytec-mvlc/scanbus_support.h>
 
 namespace mesytec
 {
@@ -282,8 +283,9 @@ Key Key::from_flash_memory(const gsl::span<uchar> data)
 
 QString Key::to_string() const
 {
-  auto fmt = boost::format("Key(sn=%|1$|%|2$08X|, sw=%|3$04X|, key=%|4$08X|)")
-    % get_prefix().toStdString() % get_sn() % get_sw() % get_key();
+  auto sw_name = mesytec::mvlc::vme_modules::mdpp_firmware_name(get_sw());
+  auto fmt = boost::format("Key(sn=%|1$|%|2$08X|, sw=%|3$04X| (%|4$4|), key=%|5$08X|)")
+    % get_prefix().toStdString() % get_sn() % get_sw() % sw_name % get_key();
 
   return QString::fromStdString(fmt.str());
 }
