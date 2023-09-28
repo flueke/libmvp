@@ -48,6 +48,12 @@ void MvlcMvpConnector::open()
     if (auto ec = d->mvlc_.connect())
         throw std::system_error(ec);
 
+    if (auto fw = d->mvlc_.firmwareRevision(); fw < 0x0036u)
+    {
+        d->mvlc_.disconnect();
+        throw std::runtime_error("Error: Firmware upgrades through VME require MVLC firmware >= FW0036");
+    }
+
     emit connectedToMVLC(m);
 
     bool addrOk = false;
