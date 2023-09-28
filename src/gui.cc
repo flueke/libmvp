@@ -279,11 +279,6 @@ MVPLabGui::~MVPLabGui()
   delete m_object_holder;
 }
 
-QAction *MVPLabGui::getToggleAdvancedAction()
-{
-  return ui->actionShowAdvanced;
-}
-
 QTextBrowser *MVPLabGui::getLogview()
 {
   return ui->logview;

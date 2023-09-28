@@ -48,7 +48,6 @@ class MVPLabGui: public QMainWindow
     explicit MVPLabGui(QWidget *parent=0);
     virtual ~MVPLabGui();
 
-    QAction *getToggleAdvancedAction();
     QTextBrowser *getLogview();
 
   protected:
