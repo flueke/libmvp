@@ -195,8 +195,8 @@ void MvlcConnectWidget::setScanbusResult(const QVariantList &scanbusResult)
     const QStringList headerLabels =
     {
         "Address",
-        "HardwareId",
-        "FirmwareId",
+        "Hardware Id",
+        "Firmware Version",
         "Module Type",
         "Firmware Type"
     };
