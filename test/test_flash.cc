@@ -165,6 +165,6 @@ void TestFlash::test_key_to_string()
   {
     Key k("ABCDEFGH", 1u, 1u, 0xffffffffu);
 
-    QCOMPARE(k.to_string(), QString("Key(sn=ABCDEFGH00000001, sw=0001, key=FFFFFFFF)"));
+    QCOMPARE(k.to_string(), QString("Key(sn=ABCDEFGH00000001, sw=0001 ( RCP), key=FFFFFFFF)"));
   }
 }
