@@ -215,6 +215,8 @@ DEF_EXEC_FUNC(scanbus_command)
     auto candidates = scan_vme_bus_for_candidates(mvlc, scanBegin, scanEnd,
         probeRegister, probeAmod, probeDataWidth);
 
+    size_t moduleCount = 0;
+
     if (!candidates.empty())
     {
         if (candidates.size() == 1)
@@ -228,41 +230,24 @@ DEF_EXEC_FUNC(scanbus_command)
         {
             VMEModuleInfo moduleInfo{};
 
-            if (auto ec = mvlc.vmeRead(addr + FirmwareRegister, moduleInfo.fwId, vme_amods::A32, VMEDataWidth::D16))
+            if (auto ec = read_module_info(mvlc, addr, moduleInfo))
             {
-                std::cout << fmt::format("Error checking address {#:010x}: {}\n", addr, ec.message());
+                std::cout << fmt::format("Error checking address {:#010x}: {}\n", addr, ec.message());
                 continue;
-            }
-
-            if (auto ec = mvlc.vmeRead(addr + HardwareIdRegister, moduleInfo.hwId, vme_amods::A32, VMEDataWidth::D16))
-            {
-                std::cout << fmt::format("Error checking address {#:010x}: {}\n", addr, ec.message());
-                continue;
-            }
-
-            if (moduleInfo.hwId == 0 && moduleInfo.fwId == 0)
-            {
-                if (auto ec = mvlc.vmeRead(addr + MVHV4FirmwareRegister, moduleInfo.fwId, vme_amods::A32, VMEDataWidth::D16))
-                {
-                    std::cout << fmt::format("Error checking address {#:010x}: {}\n", addr, ec.message());
-                    continue;
-                }
-
-                if (auto ec = mvlc.vmeRead(addr + MVHV4HardwareIdRegister, moduleInfo.hwId, vme_amods::A32, VMEDataWidth::D16))
-                {
-                    std::cout << fmt::format("Error checking address {#:010x}: {}\n", addr, ec.message());
-                    continue;
-                }
             }
 
             auto msg = fmt::format("Found module at {:#010x}: hwId={:#06x}, fwId={:#06x}, type={}",
                 addr, moduleInfo.hwId, moduleInfo.fwId, moduleInfo.moduleTypeName());
 
-            if (is_mdpp(moduleInfo.hwId))
+            if (vme_modules::is_mdpp(moduleInfo.hwId))
                 msg += fmt::format(", mdpp_fw_type={}", moduleInfo.mdppFirmwareTypeName());
 
             std::cout << fmt::format("{}\n", msg);
+            ++moduleCount;
         }
+
+        if (moduleCount)
+            std::cout << fmt::format("Scan found {} modules in total.\n", moduleCount);
     }
     else
         std::cout << fmt::format("scanbus did not find any mesytec VME modules\n");
