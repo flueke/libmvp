@@ -78,11 +78,8 @@ void SerialPortFlash::write_page(const Address &addr, uchar section,
 void SerialPortFlash::read_page(const Address &addr, uchar section,
   gsl::span<uchar> dest, int timeout_ms)
 {
-  //if (addr[0] != 0)
-  //  throw std::invalid_argument("read_page: address is not page aligned (a0!=0)");
-
-  qDebug() << "read_page: addr =" << addr << ", section =" << static_cast<uint32_t>(section)
-    << ", dest.size() =" << dest.size() << ", timeout_ms =" << timeout_ms;
+  //qDebug() << "read_page: addr =" << addr << ", section =" << static_cast<uint32_t>(section)
+  //  << ", dest.size() =" << dest.size() << ", timeout_ms =" << timeout_ms;
 
   auto len = dest.size();
 

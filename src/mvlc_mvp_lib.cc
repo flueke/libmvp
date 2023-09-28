@@ -219,7 +219,7 @@ bool check_response(const std::vector<u8> &request,
 
     if (response[0] != request[0] && response[1] == request[0])
     {
-        logger->warn("ignoring leading response byte in flash response");
+        logger->debug("ignoring leading response byte in flash response");
         ++responseBegin;
     }
 
@@ -313,8 +313,11 @@ std::error_code read_page(
     const FlashAddress &addr, u8 section, unsigned bytesToRead,
     std::vector<u8> &pageBuffer)
 {
-    if (bytesToRead > PageSize)
-        throw std::invalid_argument("read_page: bytesToRead > PageSize");
+    if (bytesToRead == 0)
+        throw std::invalid_argument("read_page: len == 0");
+
+    if (bytesToRead > constants::page_size)
+        throw std::invalid_argument("read_page: len > page size");
 
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
 
