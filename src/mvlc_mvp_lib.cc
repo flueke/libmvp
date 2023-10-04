@@ -226,6 +226,8 @@ bool check_response(const std::vector<u8> &request,
     if (!std::equal(std::begin(request), std::end(request), responseBegin))
     {
         logger->warn("request contents != response contents");
+        logger->warn("request={:#04x}, response={:#04x}",
+            fmt::join(request, ", "), fmt::join(response, ", "));
         return false;
     }
 
