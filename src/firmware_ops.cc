@@ -236,20 +236,7 @@ FirmwarePartList KeysHandler::get_key_parts_to_write()
 
 void KeysHandler::write_keys()
 {
-  const auto ki = get_keys_info();
-
-#if 0
-  for (auto key: ki.get_firmware_keys())
-  {
-      emit status_message(QString("Key read from file: %1").arg(key.to_string()));
-  }
-
-  for (auto key: ki.get_mismatched_firmware_keys())
-  {
-      emit status_message(QString("!!! OTP/Key mismatch detected: %1").arg(key.to_string()));
-  }
-#endif
-
+  const auto keys_info = get_keys_info();
   const auto key_parts = get_key_parts_to_write();
 
   if (static_cast<size_t>(key_parts.size()) > constants::max_keys) {
@@ -257,9 +244,9 @@ void KeysHandler::write_keys()
   }
 
   qDebug() << "write_keys: #key_parts =" << key_parts.size()
-    << "need_to_erase" << ki.need_to_erase();
+    << "need_to_erase" << keys_info.need_to_erase();
 
-  if (ki.need_to_erase()) {
+  if (keys_info.need_to_erase()) {
     emit status_message("Erasing keys section");
     m_flash->erase_section(constants::keys_section);
   }
