@@ -434,9 +434,6 @@ void MVPLabGui::write_firmware()
     append_to_log("Error: no or empty firmware loaded");
     return;
   }
-
-  auto area_index = firmwareSelectWidget_->get_area_index();
-
   auto steps = firmwareSelectWidget_->get_firmware_steps();
 
   if (steps == 0)
@@ -448,6 +445,35 @@ void MVPLabGui::write_firmware()
   const bool do_erase       = steps & FirmwareSteps::Step_Erase;
   const bool do_program     = steps & FirmwareSteps::Step_Program;
   const bool do_verify      = steps & FirmwareSteps::Step_Verify;
+
+  try {
+    auto otp = run_in_thread_wait_in_loop<OTP>([&] {
+      auto connector = getActiveConnector();
+      connector->open();
+      auto flash = connector->getFlash();
+      return flash->read_otp();
+    }, m_object_holder, m_fw);
+
+    const auto deviceType = otp.get_device().trimmed(); // e.g. "MDPP16"
+    for (const auto &part: m_firmware.get_area_specific_parts())
+    {
+      if (!is_binary_part(part) || !part->has_base())
+        continue;
+
+        auto partBase = part->get_base();
+        if (!partBase.startsWith(deviceType))
+        {
+          append_to_log(QSL("Firmware '%1' does not match current device type '%2'! Aborting.")
+            .arg(partBase).arg(deviceType));
+          return;
+        }
+    }
+  } catch (const std::exception &e) {
+    append_to_log(QString(e.what()));
+    return;
+  }
+
+  auto area_index = firmwareSelectWidget_->get_area_index();
 
   try {
     run_in_thread_wait_in_loop([&] {
