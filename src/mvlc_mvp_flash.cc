@@ -118,6 +118,9 @@ void MvlcMvpFlash::read_page(const Address &address, uchar section, gsl::span<uc
 
 void MvlcMvpFlash::recover(size_t tries)
 {
+    // Attempt this only once, letting any exception terminate this method.
+    maybe_enable_flash_interface();
+
     std::exception_ptr last_nop_exception;
 
     for (auto n=0u; n<tries; ++n)
