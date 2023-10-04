@@ -196,4 +196,12 @@ void MvlcMvpFlash::write_memory(const Address &start, uchar section, const gsl::
     #endif
 }
 
+void MvlcMvpFlash::boot(uchar area_index)
+{
+    std::array<uchar, 4> data = { opcodes::BFP, constants::access_code[0], constants::access_code[1], area_index };
+    write_instruction(gsl::span<uchar>(data.data(), data.size()));
+    // Deliberately not attempting to read a response: it will only result in a
+    // "no VME response" error.
+}
+
 }

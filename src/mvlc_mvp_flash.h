@@ -52,6 +52,9 @@ class MvlcMvpFlash: public mesytec::mvp::FlashInterface
 
         void write_memory(const Address &start, uchar section, const gsl::span<uchar> data) override;
 
+        // custom boot() ignoring the missing VME response.
+        void boot(uchar area_index) override;
+
     private:
         mvlc::MVLC mvlc_;
         mvlc::u32 vmeAddress_ = 0;
