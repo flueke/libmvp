@@ -191,9 +191,9 @@ class ZipFirmwareFile: public FirmwareContentsFile
 };
 
 static const QVector<QRegularExpression> filename_regexps = {
-  QRegularExpression(R"(^(?<section>\d+)_(?<area>\d+).+\.(?<extension>bin|hex)$)"),
-  QRegularExpression(R"(^(?<section>\d+)[^0-9]+.*\.(?<extension>bin|hex)$)"),
-  QRegularExpression(R"(^.+\.(?<extension>key)$)")
+  QRegularExpression(R"(^(?<section>\d+)_(?<area>\d+)_(?<base>[^.]+)\.(?<extension>bin|hex)$)"),
+  QRegularExpression(R"(^(?<section>\d+)_(?<base>[^.]+)\.(?<extension>bin|hex)$)"),
+  QRegularExpression(R"(^(?<base>[^.]+)\.(?<extension>key)$)")
 };
 
 FirmwareArchive from_firmware_file_generator(FirmwareContentsFileGenerator &gen,
@@ -222,12 +222,14 @@ FirmwareArchive from_firmware_file_generator(FirmwareContentsFileGenerator &gen,
 
     const auto s_section  = match.captured("section");
     const auto s_area     = match.captured("area");
+    const auto base       = match.captured("base");
     const auto ext        = match.captured("extension");
 
     qDebug()
       << "fn =" << fn << ":"
       << "section =" << s_section
       << ", area =" << s_area
+      << ", base =" << base
       << ", ext =" << ext;
 
     FirmwarePartPtr part;
@@ -246,6 +248,7 @@ FirmwareArchive from_firmware_file_generator(FirmwareContentsFileGenerator &gen,
       part->set_contents(fw_file->get_file_contents());
       part->set_section(convert_to_uchar(s_section));
       part->set_area(convert_to_uchar(s_area));
+      part->set_base(base);
       ret.add_part(part);
     }
   }

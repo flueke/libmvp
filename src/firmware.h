@@ -29,6 +29,7 @@ class FirmwarePart
     boost::optional<uchar> get_area() const
     { return m_area; }
 
+    // optional area index, second part of the filename
     void set_area(const boost::optional<uchar> &area)
     { m_area = area; }
 
@@ -38,11 +39,23 @@ class FirmwarePart
     boost::optional<uchar> get_section() const
     { return m_section; }
 
+    // optional section index, first part of the filename
     void set_section(const boost::optional<uchar> &section)
     { m_section = section; }
 
     bool has_section() const
     { return bool(m_section); }
+
+    // "base" is the basename part of the filename without the optional area and
+    // section indices, e.g.: MDPP16_QDC_FW3038.
+    void set_base(const QString &base)
+    { m_base = base; }
+
+    QString get_base() const
+    { return m_base; }
+
+    bool has_base() const
+    { return !m_base.isEmpty(); }
 
     ContentsType get_contents() const
     { return m_contents; }
@@ -68,6 +81,7 @@ class FirmwarePart
     QString m_filename;
     boost::optional<uchar> m_area;
     boost::optional<uchar> m_section;
+    QString m_base;
     ContentsType m_contents;
 };
 

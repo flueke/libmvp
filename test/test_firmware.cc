@@ -122,10 +122,8 @@ void TestFirmware::test_from_firmware_file_generator_empty()
 void TestFirmware::test_filename_patterns()
 {
   QMap<QString, QByteArray> data = {
-    { "12_03_otp.bin",    { "Lot's of content here" } },
-    { "12_03-aaa.bin",    { "Lot's of content here" } },
-    { "12_3_aaa.hex",     { "Lot's of content here" } },
-    { "12_3_a.hex.hex",   { "Lot's of content here" } },
+    { "12_03_aaa_bbb.bin",    { "Lot's of content here" } },
+    { "12_3_aaa_bbb.hex",     { "Lot's of content here" } },
   };
 
   FirmwareContentsFileGenerator gen =
@@ -141,6 +139,9 @@ void TestFirmware::test_filename_patterns()
 
     QVERIFY(part->has_area());
     QCOMPARE(*part->get_area(), static_cast<uchar>(3u));
+
+    QVERIFY(part->has_base());
+    QCOMPARE(part->get_base(), "aaa_bbb");
   }
 }
 
@@ -162,6 +163,9 @@ void TestFirmware::test_filename_patterns2()
     QCOMPARE(*part->get_section(), static_cast<uchar>(12u));
 
     QVERIFY(!part->has_area());
+
+    QVERIFY(part->has_base());
+    QCOMPARE(part->get_base(), "firmware_stream");
   }
 }
 
@@ -170,10 +174,10 @@ void TestFirmware::test_filename_patterns3()
   QMap<QString, QByteArray> data = {
     { "12_0_MDPP16_prototype_FW01.bin", { "The binary salad is tasty!" } },
     { "12_1_MDPP16_prototype_FW01.bin", { "The binary salad is tasty!" } },
-    { "1_hardware_descr.hex",           { "Somethings happening here" } },
-    { "8_0_area_descr.hex",             { "Somethings happening here" } },
-    { "8_1_area_descr.hex",             { "Somethings happening here" } },
-    { "mdpp16_sn1337_sw0023.key",       { "Somethings happening here" } },
+    { "1_hardware_descr.hex",           { "Something's happening here" } },
+    { "8_0_area_descr.hex",             { "Something's happening here" } },
+    { "8_1_area_descr.hex",             { "Something's happening here" } },
+    { "mdpp16_sn1337_sw0023.key",       { "Something's happening here" } },
     { "12_mdpp16_scp_fw0005.bin",       { "This resulted in area=16!" } },
   };
 
@@ -203,6 +207,10 @@ void TestFirmware::test_filename_patterns3()
   qDebug() << "key parts:";
   output_parts(parts);
   QCOMPARE(parts.size(), 1);
+
+  for (const auto &part: fw.get_parts())
+    if (is_binary_part(part))
+      QVERIFY(part->has_base());
 }
 
 void TestFirmware::test_empty_bin_part()
