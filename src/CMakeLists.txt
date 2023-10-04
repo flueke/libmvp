@@ -46,8 +46,6 @@ add_library(libmvp
     firmware_selection_widget.cc
     flash_address.cc
     flash.cc
-    flash_widget.cc
-    flash_widget.ui
     gui.cc
     gui.ui
     instruction_file.cc

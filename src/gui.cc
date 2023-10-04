@@ -3,7 +3,6 @@
 #include "ui_gui.h"
 #include "util.h"
 #include "file_dialog.h"
-#include "flash_widget.h"
 #include "firmware_ops.h"
 #include "git_version.h"
 
