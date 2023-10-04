@@ -7,6 +7,7 @@
 #include <QSettings>
 #include <QTableWidget>
 #include <QTextStream>
+#include <list>
 
 namespace mesytec::mvp
 {
@@ -30,7 +31,9 @@ std::vector<QVariantMap> load_eth_history()
     return result;
 }
 
-void store_eth_history(const std::vector<QVariantMap> &entries)
+// Container must be an iterable container containing QVariantMap instances.
+template<typename Container>
+void store_eth_history(const Container &entries)
 {
     QStringList hosts;
 
@@ -72,7 +75,7 @@ struct MvlcConnectWidget::Private
     bool isConnected_ = false;
     QVariantList prevUsbDevices_;
     // Stores connection info for each successfully connected MVLC.
-    std::vector<QVariantMap> connectHistory_;
+    std::list<QVariantMap> connectHistory_;
 
     bool isEth() const
     {
@@ -323,7 +326,7 @@ void MvlcConnectWidget::mvlcSuccessfullyConnected(const QVariantMap &info)
         [&info] (const auto &entry) { return entry["address"] == info["address"]; });
 
     d->connectHistory_.erase(it, std::end(d->connectHistory_));
-    d->connectHistory_.push_back(info);
+    d->connectHistory_.push_front(info);
 }
 
 void MvlcConnectWidget::onConnectButtonClicked()
