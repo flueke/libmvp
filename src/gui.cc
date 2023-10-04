@@ -848,10 +848,10 @@ void MVPLabGui::show_device_info()
         .arg(sw_name);
       append_to_log(str);
     }
-  } catch (const std::system_error &e) {
-    append_to_log(QSL("%1: %2")
-    .arg(e.code().category().name())
-    .arg(e.what()));
+  //} catch (const std::system_error &e) {
+  //  append_to_log(QSL("%1: %2")
+  //  .arg(e.code().category().name())
+  //  .arg(e.what()));
   } catch (const std::exception &e) {
     append_to_log(QString(e.what()));
   }
