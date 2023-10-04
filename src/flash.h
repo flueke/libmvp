@@ -206,7 +206,6 @@ namespace mvp
       virtual void erase_section(uchar section);
       virtual void write_memory(const Address &start, uchar section, const gsl::span<uchar> data);
 
-      // non-virtual
       virtual void nop();
       virtual void set_verbose(bool verbose);
       virtual void set_area_index(uchar area);

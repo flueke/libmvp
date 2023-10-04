@@ -54,7 +54,11 @@ class MVPLabGui: public QMainWindow
     virtual void closeEvent(QCloseEvent *event) override;
 
   private slots:
-    // firmware
+    // async execution gui updates
+    void handle_future_started();
+    void handle_future_finished();
+
+    // firmware and connector things
     void _on_start_button_clicked();
     void _on_firmware_file_changed(const QString &);
 
@@ -64,17 +68,10 @@ class MVPLabGui: public QMainWindow
     void mvlc_scanbus();
     void onActiveConnectorChanged();
 
-    // execution
-    void handle_future_started();
-    void handle_future_finished();
+    // actions (mvp and mvplab)
+    void show_device_info();
 
-    // misc
-    void append_to_log(const QString &s);
-    void on_actionAbout_triggered();
-    void on_actionAbout_Qt_triggered();
-    void on_actionShowAdvanced_toggled(bool checked);
-
-    // advanced
+    // advanced (mvplab only)
     void adv_dump_to_console();
     void adv_save_to_file(const QString &filename);
     void adv_load_from_file(const QString &filename);
@@ -89,6 +86,12 @@ class MVPLabGui: public QMainWindow
     void adv_mdpp16_cal_save_to_file(const QString &filename);
     void adv_mdpp32_cal_dump_to_console();
     void adv_mdpp32_cal_save_to_file(const QString &filename);
+
+    // misc
+    void append_to_log(const QString &s);
+    void on_actionAbout_triggered();
+    void on_actionAbout_Qt_triggered();
+    void on_actionShowAdvanced_toggled(bool checked);
 
   private:
     void append_to_log_queued(const QString &s);
@@ -123,6 +126,7 @@ class MVPLabGui: public QMainWindow
     QTabWidget *tabs_connectors_;
     FirmwareSelectionWidget *firmwareSelectWidget_;
     MvpAdvancedWidget *m_advancedwidget;
+    QGroupBox *gb_actions_;
     QGroupBox *advanced_widget_gb_;
     QProgressBar *m_progressbar;
     FirmwareArchive m_firmware;

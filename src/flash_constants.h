@@ -77,6 +77,9 @@ namespace mvp
     const uchar firmware_section            = 12;
     const uchar access_code[]               = { 0xCD, 0xAB };
     const uchar area_index_max              = 0x03;
+    // Actually not quite a constants: MDPP-32 only has 3 areas, whereas the
+    // other modules have 4.
+    const unsigned area_count               = area_index_max + 1;
 
     const size_t address_max      = 0xffffff;
     const size_t page_size        = 256;

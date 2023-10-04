@@ -9,6 +9,7 @@
 #include <mvp_advanced_widget.h>
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QCloseEvent>
 #include <QDateTime>
 #include <QDialogButtonBox>
@@ -110,25 +111,59 @@ MVPLabGui::MVPLabGui(QWidget *parent)
   connect(mvlcConnector_, &MvlcMvpConnector::connectedToMVLC,
     mvlcConnectWidget, &MvlcConnectWidget::mvlcSuccessfullyConnected);
 
-  // firmware selection
+  // firmware selection, steps and start button
   auto gb_fwSelect = new QGroupBox("Firmware Programming");
-  auto gb_fwSelect_layout = new QHBoxLayout(gb_fwSelect);
+  auto gb_fwSelect_layout = new QVBoxLayout(gb_fwSelect);
   gb_fwSelect_layout->setContentsMargins(0, 0, 0, 0);
   gb_fwSelect_layout->addWidget(firmwareSelectWidget_);
 
-  auto top_layout = new QHBoxLayout;
-  top_layout->addWidget(gb_connectors);
-  top_layout->addWidget(gb_fwSelect);
+  // Actions common for mvplab and mvp: show device info (without key details,
+  // boot into area).
+  auto pb_deviceInfo = new QPushButton("Read Device Info");
+  auto gb_boot = new QGroupBox;
+  auto gb_boot_layout = new QHBoxLayout(gb_boot);
+  auto combo_bootArea = new QComboBox;
+  for (auto i=0; i<constants::area_count; ++i)
+    combo_bootArea->addItem(QSL("%1").arg(i), i);
+  auto pb_boot = new QPushButton("Boot Device");
+  gb_boot_layout->addWidget(new QLabel("Flash Area"));
+  gb_boot_layout->setContentsMargins(2, 2, 2, 2);
+  gb_boot_layout->addWidget(combo_bootArea);
+  gb_boot_layout->addWidget(pb_boot);
 
-  advanced_widget_gb_     = new QGroupBox("Advanced");
+  gb_actions_ = new QGroupBox("Actions");
+  auto actions_layout = new QHBoxLayout(gb_actions_);
+  actions_layout->setContentsMargins(0, 0, 0, 0);
+  actions_layout->addStretch(1);
+  actions_layout->addWidget(pb_deviceInfo);
+  actions_layout->addWidget(gb_boot);
+  actions_layout->addStretch(1);
+
+  auto top_layout = new QGridLayout;
+  top_layout->addWidget(gb_connectors, 0, 0);
+  top_layout->addWidget(gb_fwSelect, 0, 1);
+  top_layout->addWidget(gb_actions_, 1, 1);
+
+  connect(pb_deviceInfo, &QPushButton::clicked,
+    this, &MVPLabGui::show_device_info);
+
+  connect(pb_boot, &QPushButton::clicked,
+    this, [=] {
+      auto area = combo_bootArea->currentData().toUInt();
+      this->adv_boot(area);
+    });
+
+  // Advanced widget for mvplab, hidden in mvp.
+  advanced_widget_gb_ = new QGroupBox("Advanced");
   auto advanced_widget_layout = new QHBoxLayout(advanced_widget_gb_);
   advanced_widget_layout->setContentsMargins(2, 2, 2, 2);
   advanced_widget_layout->addWidget(m_advancedwidget);
 
-  auto layout = qobject_cast<QBoxLayout *>(centralWidget()->layout());
-  layout->insertLayout(0, top_layout);
-  layout->insertWidget(1, advanced_widget_gb_);
-  layout->setStretch(2, 1);
+  auto layout = qobject_cast<QBoxLayout *>(centralWidget()->layout()); assert(layout);
+  int row = 0;
+  layout->insertLayout(row++, top_layout);
+  layout->insertWidget(row++, advanced_widget_gb_);
+  layout->setStretch(row, 1);
 
   ui->statusbar->addPermanentWidget(m_progressbar);
   ui->statusbar->setSizeGripEnabled(false);
@@ -629,6 +664,7 @@ void MVPLabGui::append_to_log(const QString &s)
 void MVPLabGui::handle_future_started()
 {
   tabs_connectors_->setEnabled(false);
+  gb_actions_->setEnabled(false);
   m_advancedwidget->setEnabled(false);
   firmwareSelectWidget_->setEnabled(false);
   m_progressbar->setVisible(true);
@@ -639,6 +675,7 @@ void MVPLabGui::handle_future_finished()
   m_loop.quit();
 
   tabs_connectors_->setEnabled(true);
+  gb_actions_->setEnabled(true);
   m_advancedwidget->setEnabled(true);
   firmwareSelectWidget_->setEnabled(true);
   m_progressbar->setVisible(false);
@@ -753,6 +790,45 @@ void MVPLabGui::_show_logview_context_menu(const QPoint &pos)
   auto action = menu->addAction("Clear");
   connect(action, &QAction::triggered, ui->logview, &QTextBrowser::clear);
   menu->exec(ui->logview->mapToGlobal(pos));
+}
+
+// Similar to adv_keys_info() but does not display the actual key. Also shows
+// the selected boot area (dip switches).
+void MVPLabGui::show_device_info()
+{
+  try {
+    auto keys_info = read_device_keys();
+    auto otp = keys_info.get_otp();
+    auto devName = otp.get_device().trimmed();
+
+    append_to_log(QString("Device Info: type='<b>%1</b>', serial=<b>%2</b>")
+                  .arg(devName)
+                  .arg(otp.get_sn(), 8, 16, QLatin1Char('0'))
+                 );
+
+    const auto device_keys = keys_info.get_device_keys();
+
+    append_to_log(QString("  %1/%2 keys on device%3")
+    .arg(device_keys.size())
+    .arg(constants::max_keys)
+    .arg(device_keys.size() ? ":" : "")
+    );
+
+    for (const auto &key: device_keys)
+    {
+      auto sw_name = QString::fromStdString(mesytec::mvlc::vme_modules::mdpp_firmware_name(key.get_sw()));
+      auto str = QSL("    id=%1, name=%2")
+        .arg(key.get_sw(), 4, 16, QLatin1Char('0'))
+        .arg(sw_name);
+      append_to_log(str);
+    }
+  } catch (const std::system_error &e) {
+    append_to_log(QSL("%1: %2")
+    .arg(e.code().category().name())
+    .arg(e.what()));
+  } catch (const std::exception &e) {
+    append_to_log(QString(e.what()));
+  }
 }
 
 void MVPLabGui::adv_dump_to_console()
@@ -968,11 +1044,10 @@ void MVPLabGui::adv_read_hardware_id()
 KeysInfo MVPLabGui::read_device_keys()
 {
     auto flash = getActiveConnector()->getFlash();
-    auto keys_handler = std::unique_ptr<KeysHandler>(
-        new KeysHandler(
+    auto keys_handler = std::make_unique<KeysHandler>(
           m_firmware,
           flash,
-          m_object_holder));
+          m_object_holder);
 
     auto keys_info = run_in_thread_wait_in_loop<KeysInfo>([&] {
         auto connector = getActiveConnector();
