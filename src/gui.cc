@@ -434,6 +434,7 @@ void MVPLabGui::write_firmware()
     append_to_log("Error: no or empty firmware loaded");
     return;
   }
+
   auto steps = firmwareSelectWidget_->get_firmware_steps();
 
   if (steps == 0)
@@ -454,7 +455,9 @@ void MVPLabGui::write_firmware()
       return flash->read_otp();
     }, m_object_holder, m_fw);
 
-    const auto deviceType = otp.get_device().trimmed(); // e.g. "MDPP16"
+    auto deviceType = otp.get_device().trimmed(); // e.g. "MDPP16"
+    deviceType.remove(QChar('-')); // Workaround for the MDPP-32 which contains "MDPP-32" in the OTP.
+
     for (const auto &part: m_firmware.get_area_specific_parts())
     {
       if (!is_binary_part(part) || !part->has_base())
