@@ -36,9 +36,8 @@ std::error_code read_output_fifo(MVLC &mvlc, u32 moduleBase, u32 &dest)
     return mvlc.vmeRead(moduleBase + OutputFifoRegister, dest, vme_amods::A32, VMEDataWidth::D16);
 }
 
-// FIXME: clear_output_fifo() is dangerous as it might never return!
-// FIXME: do not use this function. instead correctly read and parse the
-// expected response
+static const std::chrono::milliseconds MaxResponseWaitTime(2500);
+
 std::error_code clear_output_fifo(MVLC &mvlc, u32 moduleBase)
 {
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
@@ -47,7 +46,6 @@ std::error_code clear_output_fifo(MVLC &mvlc, u32 moduleBase)
     auto tStart = std::chrono::steady_clock::now();
 
     size_t cycles = 0;
-    //std::vector<u32> readBuffer;
 
     while (true)
     {
@@ -57,8 +55,6 @@ std::error_code clear_output_fifo(MVLC &mvlc, u32 moduleBase)
             moduleBase + OutputFifoRegister,
             fifoValue, vme_amods::A32, VMEDataWidth::D16);
 
-        //readBuffer.push_back(fifoValue);
-
         ++cycles;
 
         if (ec) return ec;
@@ -67,10 +63,15 @@ std::error_code clear_output_fifo(MVLC &mvlc, u32 moduleBase)
             break;
 
         logger->debug("  clear_output_fifo: 0x{:04x} = 0x{:08x}", OutputFifoRegister, fifoValue);
+
+        if (auto elapsed = std::chrono::steady_clock::now() - tStart;
+            elapsed >= MaxResponseWaitTime)
+        {
+            logger->warn("clear_output_fifo: Max wait time for empty fifo exceeded, returning.");
+            return std::make_error_code(std::errc::timed_out);
+        }
     }
 
-    //if (cycles > 1)
-    //  log_buffer(std::cout, readBuffer, "clear_output_fifo read buffer");
     auto tEnd = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(tEnd - tStart);
     logger->debug("clear_output_fifo() returned after {} read cycles, took {} ms to clear the fifo",
@@ -164,8 +165,9 @@ std::error_code write_instruction(MVLC &mvlc, u32 moduleBase, const gsl::span<un
 std::error_code read_response(MVLC &mvlc, u32 moduleBase, std::vector<u8> &dest)
 {
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
+    auto tStart = std::chrono::steady_clock::now();
 
-    while (true) // FIXME: dangerous. do time out at some point
+    while (true)
     {
         u32 fifoValue = 0;
 
@@ -183,6 +185,13 @@ std::error_code read_response(MVLC &mvlc, u32 moduleBase, std::vector<u8> &dest)
         }
 
         dest.push_back(fifoValue & 0xff);
+
+        if (auto elapsed = std::chrono::steady_clock::now() - tStart;
+            elapsed >= MaxResponseWaitTime)
+        {
+            logger->warn("read_response: Max wait time for empty fifo exceeded, returning.");
+            return std::make_error_code(std::errc::timed_out);
+        }
     }
 
     logger->debug("read_response: moduleBase=0x{:08x}, got {} bytes: {:02x}",
