@@ -130,6 +130,13 @@ void MvlcMvpFlash::recover(size_t tries)
             nop();
             return;
         }
+        catch(const std::system_error &e)
+        {
+            if (e.code() == std::errc::timed_out)
+                throw;
+            last_nop_exception = std::current_exception();
+            clear_output_fifo(mvlc_, vmeAddress_);
+        }
         catch(const std::exception& e)
         {
             last_nop_exception = std::current_exception();
