@@ -613,7 +613,7 @@ Core Commands:
 
 Core Switches:
     -v | --version
-        Show mvlc-cli and mesytec-mvlc versions.
+        Show mvlc-mvp-updater and mesytec-mvlc versions.
 
     -h <command> | --help <command>
         Show help for the given command and exit.
@@ -731,10 +731,11 @@ int main(int argc, char *argv[])
 
     if (parser[{"-v", "--version"}])
     {
-        std::cout << fmt::format("mvlc_mvp_updater - version {}\n", mesytec::mvp::library_version());
+        std::cout << fmt::format("mvlc-mvp-updater - version {}\n", mesytec::mvp::library_version());
         std::cout << fmt::format("mesytec-mvlc     - version {}\n", mesytec::mvlc::library_version());
         return 0;
     }
 
+    std::cout << GeneralHelp;
     return 0;
 }
