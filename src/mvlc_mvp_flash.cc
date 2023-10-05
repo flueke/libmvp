@@ -208,7 +208,18 @@ void MvlcMvpFlash::boot(uchar area_index)
     std::array<uchar, 4> data = { opcodes::BFP, constants::access_code[0], constants::access_code[1], area_index };
     write_instruction(gsl::span<uchar>(data.data(), data.size()));
     // Deliberately not attempting to read a response: it will only result in a
-    // "no VME response" error.
+    // "no VME response" error as the module is rebooting.
+}
+
+void MvlcMvpFlash::ensure_response_ok(
+    const gsl::span<uchar> &instruction,
+    const gsl::span<uchar> &response)
+{
+    std::vector<u8> v_instruction(std::begin(instruction), std::end(instruction));
+    std::vector<u8> v_response(std::begin(response), std::end(response));
+
+    if (!check_response(v_instruction, v_response))
+        throw FlashInstructionError(instruction, response, "check_response() not ok");
 }
 
 }

@@ -213,16 +213,15 @@ namespace mvp
       virtual void boot(uchar area_index);
       virtual void enable_write();
       virtual uchar read_hardware_id();
+      virtual void ensure_response_ok(
+        const gsl::span<uchar> &instruction,
+        const gsl::span<uchar> &response);
 
       void read_response(QVector<uchar> &buf, size_t len,
         int timeout_ms = constants::default_timeout_ms);
 
       QVector<uchar> read_page(const Address &address, uchar section, size_t len,
         int timeout_ms = constants::data_timeout_ms);
-
-      void ensure_response_ok(
-        const gsl::span<uchar> &instruction,
-        const gsl::span<uchar> &response);
 
       void ensure_response_code_ok(
         const gsl::span<uchar> &response_code) const;
