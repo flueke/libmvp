@@ -447,6 +447,15 @@ void MVPLabGui::write_firmware()
   const bool do_program     = steps & FirmwareSteps::Step_Program;
   const bool do_verify      = steps & FirmwareSteps::Step_Verify;
 
+  // Device type workarounds for devices where a simple prefix match does not
+  // suffice. MDPP-32 contains a '-' in the device type, VMMR8 uses the VMMR16
+  // firmware.
+  static const QMap<QString, QString> DeviceTypeTranslate =
+  {
+    { "MDPP-32", "MDPP32" },
+    { "VMMR8", "VMMR16" },
+  };
+
   try {
     auto otp = run_in_thread_wait_in_loop<OTP>([&] {
       auto connector = getActiveConnector();
@@ -456,7 +465,7 @@ void MVPLabGui::write_firmware()
     }, m_object_holder, m_fw);
 
     auto deviceType = otp.get_device().trimmed(); // e.g. "MDPP16"
-    deviceType.remove(QChar('-')); // Workaround for the MDPP-32 which contains "MDPP-32" in the OTP.
+    deviceType = DeviceTypeTranslate.value(deviceType, deviceType);
 
     for (const auto &part: m_firmware.get_area_specific_parts())
     {
