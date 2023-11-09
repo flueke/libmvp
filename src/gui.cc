@@ -452,8 +452,10 @@ void MVPLabGui::write_firmware()
   // firmware.
   static const QMap<QString, QString> DeviceTypeTranslate =
   {
-    { "MDPP-32", "MDPP32" },
-    { "VMMR8", "VMMR16" },
+    // OTP device type -> device type for matching against firmware filenames
+    //                    (not the package filename but the .bin filename!)
+    { "MDPP-32",  "MDPP32" },
+    { "VMMR8",    "VMMR16" },
   };
 
   try {
@@ -464,8 +466,8 @@ void MVPLabGui::write_firmware()
       return flash->read_otp();
     }, m_object_holder, m_fw);
 
-    auto deviceType = otp.get_device().trimmed(); // e.g. "MDPP16"
-    deviceType = DeviceTypeTranslate.value(deviceType, deviceType);
+    auto deviceType = otp.get_device().trimmed(); // e.g. "MDPP-32"
+    deviceType = DeviceTypeTranslate.value(deviceType, deviceType); // translated, e.g. MDPP32
 
     for (const auto &part: m_firmware.get_area_specific_parts())
     {
@@ -473,7 +475,7 @@ void MVPLabGui::write_firmware()
         continue;
 
         auto partBase = part->get_base();
-        if (!partBase.startsWith(deviceType))
+        if (!partBase.startsWith(deviceType)) // prefix match of the part base against the translated device type
         {
           append_to_log(QSL("Firmware '%1' does not match current device type '%2'! Aborting.")
             .arg(partBase).arg(deviceType));
