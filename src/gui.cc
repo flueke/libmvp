@@ -1077,7 +1077,7 @@ void MVPLabGui::adv_read_hardware_id()
     append_to_log(QString("Hardware ID = 0x%1").arg(
           QString::number(static_cast<int>(f_result.result()), 16)));
   } catch (const std::exception &e) {
-    append_to_log(QString(e.what()));
+    append_to_log(QString("Error from read_hardware_id(): %1").arg(e.what()));
   }
 }
 
