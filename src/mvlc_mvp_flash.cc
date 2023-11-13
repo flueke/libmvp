@@ -1,5 +1,6 @@
 #include "mvlc_mvp_flash.h"
 #include "mvlc_mvp_lib.h"
+#include "mvlc_mvp_connector.h"
 
 using namespace mesytec::mvlc;
 using namespace mesytec::mvp;
@@ -38,10 +39,26 @@ u32 MvlcMvpFlash::getVmeAddress() const
 
 void MvlcMvpFlash::maybe_enable_flash_interface()
 {
+    using namespace mesytec::mvlc::vme_modules;
+
     if (!isFlashEnabled_)
     {
+        u32 hwId = 0, fwId = 0;
+
+        if (auto ec = mvlc_.vmeRead(vmeAddress_ + HardwareIdRegister, hwId, vme_amods::A32, VMEDataWidth::D16))
+            throw std::runtime_error(fmt::format("Error reading hardware id from {:#10x}: {}", vmeAddress_, ec.message()));
+
+        if (auto ec = mvlc_.vmeRead(vmeAddress_ + FirmwareRegister, fwId, vme_amods::A32, VMEDataWidth::D16))
+            throw std::runtime_error(fmt::format("Error reading firmware revision from {:#10x}: {}", vmeAddress_, ec.message()));
+
+        auto canFlash = can_flash_through_vme(hwId, fwId);
+
+        if (!canFlash.first)
+            throw std::runtime_error(canFlash.second);
+
         if (auto ec = enable_flash_interface(mvlc_, vmeAddress_))
             throw std::system_error(ec);
+
         isFlashEnabled_ = true;
     }
 }

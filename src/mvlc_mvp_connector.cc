@@ -1,5 +1,6 @@
 #include "mvlc_mvp_connector.h"
 
+#include <mesytec-mvlc/mesytec_vme_modules.h>
 #include <mesytec-mvlc/mvlc_impl_usb.h>
 #include <mesytec-mvlc/scanbus_support.h>
 
@@ -47,12 +48,6 @@ void MvlcMvpConnector::open()
 
     if (auto ec = d->mvlc_.connect())
         throw std::system_error(ec);
-
-    if (auto fw = d->mvlc_.firmwareRevision(); fw < 0x0036u)
-    {
-        d->mvlc_.disconnect();
-        throw std::runtime_error("Error: Firmware upgrades through VME require MVLC firmware >= FW0036");
-    }
 
     emit connectedToMVLC(m);
 
@@ -127,6 +122,21 @@ QVariantList MvlcMvpConnector::scanbus()
     emit scanbusResultReady(result);
 
     return result;
+}
+
+std::pair<bool, std::string> can_flash_through_vme(const QVariantMap &deviceInfo)
+{
+    auto hwId = deviceInfo["hwId"].toUInt();
+    auto fwId = deviceInfo["fwId"].toUInt();
+    return can_flash_through_vme(hwId, fwId);
+}
+
+std::pair<bool, std::string> can_flash_through_vme(mvlc::u32 hwId, mvlc::u32 fwId)
+{
+    if (hwId == mesytec::mvlc::vme_modules::HardwareIds::MVLC && fwId < 0x0036u)
+        return std::make_pair(false, std::string("Error: MVLC firmware upgrades through VME require MVLC firmware >= FW0036"));
+
+    return std::make_pair(true, std::string());
 }
 
 }
