@@ -456,6 +456,7 @@ void MVPLabGui::write_firmware()
     //                    (not the package filename but the .bin filename!)
     { "MDPP-32",  "MDPP32" },
     { "VMMR8",    "VMMR16" },
+    { "MCPD8",    "MCPD-8" },
   };
 
   try {
