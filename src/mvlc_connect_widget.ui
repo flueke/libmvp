@@ -56,10 +56,10 @@
        <item>
         <widget class="QPushButton" name="pb_refresh">
          <property name="toolTip">
-          <string>Refresh serial ports</string>
+          <string>Refresh USB devices</string>
          </property>
          <property name="statusTip">
-          <string>Refresh serial ports</string>
+          <string>Refresh USB devices</string>
          </property>
          <property name="text">
           <string/>
