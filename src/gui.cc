@@ -476,7 +476,9 @@ void MVPLabGui::write_firmware()
         continue;
 
         auto partBase = part->get_base();
-        if (!partBase.startsWith(deviceType)) // prefix match of the part base against the translated device type
+        // Prefix match of the firmware part base against the translated device
+        // type, both lowercased.
+        if (!partBase.toLower().startsWith(deviceType.toLower()))
         {
           append_to_log(QSL("Firmware '%1' does not match current device type '%2'! Aborting.")
             .arg(partBase).arg(deviceType));
