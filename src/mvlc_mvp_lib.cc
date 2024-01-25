@@ -127,7 +127,7 @@ std::error_code set_area_index(MVLC &mvlc, u32 moduleBase, unsigned area)
 std::error_code enable_flash_write(MVLC &mvlc, u32 moduleBase)
 {
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
-    logger->info("Enabling flash write on 0x{:08x}", moduleBase);
+    logger->debug("Enabling flash write on 0x{:08x}", moduleBase);
 
     std::vector<u8> instr = { 0x80, 0xCD, 0xAB };
     std::vector<u8> response;
@@ -941,7 +941,7 @@ std::error_code erase_section(
     if (auto ec = read_response(mvlc, moduleBase, response))
         return ec;
 
-    logger->info("Response from erase instruction: {:02x}", fmt::join(response, ", "));
+    logger->debug("Response from erase instruction: {:02x}", fmt::join(response, ", "));
 
     if (instr != response)
     {
@@ -954,8 +954,10 @@ std::error_code erase_section(
     u32 outputFifoValue = 0u;
     u32 loops = 0u;
 
+    logger->info("Waiting until erase is complete...");
+
     // Poll until InvalidRead flag is set
-    logger->info("Polling until InvalidRead is set");
+    logger->debug("Polling until InvalidRead is set");
     do
     {
         if (auto ec = read_output_fifo(mvlc, moduleBase, outputFifoValue))
@@ -964,11 +966,11 @@ std::error_code erase_section(
         ++loops;
     } while (!(outputFifoValue & output_fifo_flags::InvalidRead));
 
-    logger->info("Done polling until InvalidRead is set, loops={}", loops);
+    logger->debug("Done polling until InvalidRead is set, loops={}", loops);
     loops = 0u;
 
     // Now poll until InvalidRead is not set anymore
-    logger->info("Polling until InvalidRead is cleared");
+    logger->debug("Polling until InvalidRead is cleared");
     do
     {
         if (auto ec = read_output_fifo(mvlc, moduleBase, outputFifoValue))
@@ -977,7 +979,7 @@ std::error_code erase_section(
         ++loops;
     } while (outputFifoValue & output_fifo_flags::InvalidRead);
 
-    logger->info("Done polling until InvalidRead is cleared, loops={}", loops);
+    logger->debug("Done polling until InvalidRead is cleared, loops={}", loops);
     loops = 0u;
 
     // outputFifofValue should now contain the flash response code 0xff
@@ -997,7 +999,7 @@ std::error_code erase_section(
     auto tEnd = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(tEnd - tStart);
 
-    logger->info("flash response status ok, erasing took {} ms", elapsed.count());
+    logger->info("Flash response status ok, erasing took {} ms", elapsed.count());
 
     return {};
 }
