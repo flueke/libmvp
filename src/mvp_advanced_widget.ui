@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>619</width>
-    <height>170</height>
+    <height>178</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -379,6 +379,13 @@
       <widget class="QPushButton" name="pb_manage_keys">
        <property name="text">
         <string>Manage Keys</string>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="3">
+      <widget class="QPushButton" name="pb_dip_switches">
+       <property name="text">
+        <string>DIP Switches</string>
        </property>
       </widget>
      </item>

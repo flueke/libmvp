@@ -43,6 +43,9 @@ MvpAdvancedWidget::MvpAdvancedWidget(QWidget *parent)
   connect(ui->pb_rdi, SIGNAL(clicked()),
       this, SIGNAL(sig_read_hardware_id()));
 
+  connect(ui->pb_dip_switches, SIGNAL(clicked()),
+      this, SIGNAL(sig_read_dip_switches()));
+
   connect(ui->pb_keys_info, SIGNAL(clicked()),
       this, SIGNAL(sig_keys_info()));
 

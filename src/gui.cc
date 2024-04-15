@@ -285,6 +285,9 @@ MVPLabGui::MVPLabGui(QWidget *parent)
   connect(m_advancedwidget, SIGNAL(sig_read_hardware_id()),
       this, SLOT(adv_read_hardware_id()));
 
+  connect(m_advancedwidget, SIGNAL(sig_read_dip_switches()),
+      this, SLOT(adv_read_dip_switches()));
+
   connect(m_advancedwidget, SIGNAL(sig_keys_info()),
       this, SLOT(adv_keys_info()));
 
@@ -1081,6 +1084,42 @@ void MVPLabGui::adv_read_hardware_id()
           QString::number(static_cast<int>(f_result.result()), 16)));
   } catch (const std::exception &e) {
     append_to_log(QString("Error from read_hardware_id(): %1").arg(e.what()));
+  }
+}
+
+void MVPLabGui::adv_read_dip_switches()
+{
+  ThreadMover tm(m_object_holder, 0);
+  auto f_result = run_in_thread<int>([&] {
+        qDebug() << "gui: open_port";
+        auto connector = getActiveConnector();
+        connector->open();
+        auto flash = connector->getFlash();
+        qDebug() << "gui: ensure clean flash state";
+        flash->ensure_clean_state();
+        for (int i=0; i<100; ++i)
+        {
+          flash->nop();
+          auto ss = flash->get_last_status();
+          auto dips = get_dipswitch(ss);
+          if (dips != 0)
+            return dips;
+        }
+        return 0;
+      }, m_object_holder);
+
+  m_fw.setFuture(f_result);
+
+  if (!m_fw.isFinished())
+    m_loop.exec();
+
+  try {
+    auto dips = f_result.result();
+    append_to_log(
+          QString("Boot area on power cycle is %1 (dipswitches).")
+          .arg(dips));
+  } catch (const std::exception &e) {
+    append_to_log(QString("Error reading dip switch status(): %1").arg(e.what()));
   }
 }
 

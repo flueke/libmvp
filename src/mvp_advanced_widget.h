@@ -28,6 +28,7 @@ class MvpAdvancedWidget: public QWidget
     void sig_nop_recovery();
     void sig_erase_section(uchar, uchar);  // area, section
     void sig_read_hardware_id();
+    void sig_read_dip_switches();
     void sig_keys_info();
     void sig_manage_keys();
     void sig_mdpp16_cal_dump_to_console();

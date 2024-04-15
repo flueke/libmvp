@@ -79,6 +79,7 @@ class MVPLabGui: public QMainWindow
     void adv_nop_recovery();
     void adv_erase_section(uchar area, uchar section);
     void adv_read_hardware_id();
+    void adv_read_dip_switches();
     KeysInfo read_device_keys();
     void adv_keys_info();
     void adv_manage_keys();
