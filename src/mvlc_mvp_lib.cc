@@ -202,6 +202,8 @@ std::error_code read_response(MVLC &mvlc, u32 moduleBase, std::vector<u8> &dest)
 bool check_response(const std::vector<u8> &request,
                     const std::vector<u8> &response)
 {
+    //auto response = response_; // When simulating the failure condition below.
+
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
 
     logger->trace("check_response: request ={:#04x}", fmt::join(request, ","));
@@ -220,6 +222,14 @@ bool check_response(const std::vector<u8> &request,
         return false;
     }
 
+    #if 0
+    // Hack to simulate a failure condition occuring with some MDPP32 modules. Do not enable this in prod builds!
+    if (request == std::vector<u8>{ 0x80, 0xcd, 0xab })
+    {
+        response = std::vector<u8>(std::begin(response)+1, std::end(response));
+    }
+    #endif
+
     // Workaround for MVLC flash interface issues: sometimes the response starts
     // with an additional byte of data, probably related to the current or last
     // fifo status byte. The code checks for this condition and ignores the byte
@@ -234,10 +244,24 @@ bool check_response(const std::vector<u8> &request,
 
     if (!std::equal(std::begin(request), std::end(request), responseBegin))
     {
-        logger->warn("request contents != response contents");
-        logger->warn("request={:#04x}, response={:#04x}",
+        logger->debug("request contents != response contents");
+        logger->debug("request={:#04x}, response={:#04x}",
             fmt::join(request, ", "), fmt::join(response, ", "));
-        return false;
+
+        // Another workaround for some MDPP32 modules: the response is missing
+        // the first word of the request but contains an additional status word
+        // (0x301) at the end. Pop off the first word of the request and compare
+        // that against the response. If it compares fine assume the response is
+        // ok.
+        logger->debug("check_response: using flash chip workaround for response checking");
+        std::vector<u8> shortenedRequest(std::begin(request) + 1, std::end(request));
+        if (!std::equal(std::begin(shortenedRequest), std::end(shortenedRequest), responseBegin))
+        {
+            logger->debug("check_response: shortened request contents still != response contents");
+            logger->debug("check_response: shortened request={:#04x}, response={:#04x}",
+                fmt::join(shortenedRequest, ", "), fmt::join(response, ", "));
+            return false;
+        }
     }
 
     u8 codeStart = *(response.end() - 2);
@@ -757,7 +781,6 @@ std::error_code write_page4(
 
     std::vector<u8> flashResponse;
     fill_page_buffer_from_stack_output(flashResponse, stackResponse);
-    //std::copy(std::begin(stackResponse) + 2, std::end(stackResponse), std::back_inserter(flashResponse));
 
     if (!check_response(EfwRequest, flashResponse))
     {
