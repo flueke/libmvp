@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <mesytec-mvlc/scanbus_support.h>
 #include <mesytec-mvlc/util/string_util.h>
+#include <device_type_check.h>
 #include <mvlc_mvp_lib.h>
 #include <mvlc_mvp_flash.h>
 #include <git_version.h>
@@ -441,6 +442,15 @@ DEF_EXEC_FUNC(write_firmware_command)
     try
     {
         MvlcMvpFlash flash(mvlc, vmeAddress);
+
+        auto targetDeviceType = flash.read_otp().get_device().trimmed();
+
+        if (!check_device_type_match(targetDeviceType, firmware,
+            [](const QString &msg) { std::cout << msg.toLocal8Bit().constData() << "\n"; }))
+        {
+            return 1;
+        }
+
         mesytec::mvp::FirmwareWriter writer(firmware, &flash);
         writer.set_do_erase(doErase);
         writer.set_do_verify(doVerify);
