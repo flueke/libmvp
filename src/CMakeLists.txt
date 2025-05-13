@@ -40,6 +40,7 @@ configure_file("git_version.cc.in" "git_version.cc" @ONLY)
 
 add_library(libmvp
     "${CMAKE_CURRENT_BINARY_DIR}/git_version.cc"
+    device_type_check.cc
     file_dialog.cc
     firmware.cc
     firmware_ops.cc

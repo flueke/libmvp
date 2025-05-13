@@ -31,6 +31,7 @@
 #include <utility>
 
 #include "mdpp16.h"
+#include "device_type_check.h"
 
 #include <mvlc_connect_widget.h>
 #include <serial_port_connect_widget.h>
@@ -450,18 +451,6 @@ void MVPLabGui::write_firmware()
   const bool do_program     = steps & FirmwareSteps::Step_Program;
   const bool do_verify      = steps & FirmwareSteps::Step_Verify;
 
-  // Device type workarounds for devices where a simple prefix match does not
-  // suffice. MDPP-32 contains a '-' in the device type, VMMR8 uses the VMMR16
-  // firmware.
-  static const QMap<QString, QString> DeviceTypeTranslate =
-  {
-    // OTP device type -> device type for matching against firmware filenames
-    //                    (not the package filename but the .bin filename!)
-    { "MDPP-32",  "MDPP32" },
-    { "VMMR8",    "VMMR16" },
-    { "MCPD8",    "MCPD-8" },
-  };
-
   try {
     auto otp = run_in_thread_wait_in_loop<OTP>([&] {
       auto connector = getActiveConnector();
@@ -470,23 +459,10 @@ void MVPLabGui::write_firmware()
       return flash->read_otp();
     }, m_object_holder, m_fw);
 
-    auto deviceType = otp.get_device().trimmed(); // e.g. "MDPP-32"
-    deviceType = DeviceTypeTranslate.value(deviceType, deviceType); // translated, e.g. MDPP32
-
-    for (const auto &part: m_firmware.get_area_specific_parts())
+    if (!check_device_type_match(otp.get_device(), m_firmware,
+        [this](const QString &msg) { append_to_log(msg); }))
     {
-      if (!is_binary_part(part) || !part->has_base())
-        continue;
-
-        auto partBase = part->get_base();
-        // Prefix match of the firmware part base against the translated device
-        // type, both lowercased.
-        if (!partBase.toLower().startsWith(deviceType.toLower()))
-        {
-          append_to_log(QSL("Firmware '%1' does not match current device type '%2'! Aborting.")
-            .arg(partBase).arg(deviceType));
-          return;
-        }
+      return;
     }
   } catch (const std::exception &e) {
     append_to_log(QString(e.what()));
