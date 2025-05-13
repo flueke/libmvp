@@ -526,6 +526,162 @@ Options:
     .exec = write_firmware_command,
 };
 
+DEF_EXEC_FUNC(verify_firmware_command)
+{
+    (void) self; (void) argc; (void) argv;
+    spdlog::trace("entered verify_firmware_command()");
+
+    using namespace mesytec::mvp;
+
+    u32 vmeAddress = 0;
+    unsigned area = 0;
+    std::string firmwareInput;
+
+    auto parser = ctx.parser;
+    parser.add_params({"--vme-address", "--area", "--firmware"});
+    parser.parse(argv);
+    trace_log_parser_info(parser, "write_firmware_command");
+
+    if (!parse_into(parser, "--vme-address", vmeAddress, convert_to_unsigned))
+        return 1;
+
+    if (!parse_into(parser, "--area", area, convert_to_unsigned))
+        return 1;
+
+    if (!(parser("--firmware") >> firmwareInput))
+    {
+        std::cerr << "Error: missing --firmware <file|dir> parameter!\n";
+        return 1;
+    }
+
+    mesytec::mvp::FirmwareArchive firmware;
+    namespace fs = std::filesystem;
+
+    auto st = fs::status(firmwareInput);
+    auto qFirmwareInput = QString::fromStdString(firmwareInput);
+
+    try
+    {
+        if (st.type() == fs::file_type::directory)
+            firmware = mesytec::mvp::from_dir(qFirmwareInput);
+        else
+        {
+            auto ext = str_tolower(fs::path(firmwareInput).extension().string());
+            if (ext == ".bin" || ext == ".key" || ext == ".hex")
+                firmware = mesytec::mvp::from_single_file(qFirmwareInput);
+            else
+                firmware = mesytec::mvp::from_zip(qFirmwareInput);
+        }
+
+        if (firmware.is_empty())
+        {
+            std::cerr << "Error: empty firmware data from " << firmwareInput << "\n";
+            return 1;
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << fmt::format("Error reading firmware from {}: {}\n", firmwareInput, e.what());
+        return 1;
+    }
+
+    auto [mvlc, ec] = make_and_connect_default_mvlc(ctx.parser);
+
+    if (!mvlc || ec)
+        return 1;
+
+    try
+    {
+        MvlcMvpFlash flash(mvlc, vmeAddress);
+        mesytec::mvp::FirmwareWriter writer(firmware, &flash);
+        writer.set_do_erase(false);
+        writer.set_do_program(false);
+        writer.set_do_verify(true);
+        int curProgress = 0;
+        int maxProgress = 0;
+        QString writerStatus;
+        QElapsedTimer reportTimer;
+        static int ReportInterval_ms = 500;
+
+        auto maybe_report = [&]
+        {
+            if (reportTimer.elapsed() >= ReportInterval_ms)
+            {
+                std::cout << fmt::format("verify-firmware: {} (page {}/{})\n",
+                    writerStatus.toStdString(), curProgress, maxProgress);
+                reportTimer.start();
+            }
+        };
+
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_range_changed, [&maxProgress] (int min, int max) {
+            maxProgress = max;
+        });
+
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_changed, [&] (int progress) {
+            //std::cout << fmt::format("FlashInterface::progress: {}/{}\n", progress, maxProgress);
+            curProgress = progress;
+            maybe_report();
+        });
+
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::progress_text_changed, [] (const QString &txt) {
+            std::cout << fmt::format("FlashInterface: {}\n", txt.toStdString());
+        });
+
+        QObject::connect(&flash, &mesytec::mvp::FlashInterface::statusbyte_received, [] (const u8 &status) {
+            //std::cout << fmt::format("FlashInterface::statusbyte: 0x{:02x}\n", status);
+        });
+
+        QObject::connect(&writer, &mesytec::mvp::FirmwareWriter::status_message, [&] (const QString &msg) {
+            //std::cout << "FirmwareWriter status: " << msg.toStdString() << "\n";
+            writerStatus = msg;
+            maybe_report();
+        });
+
+        reportTimer.start();
+        writer.write();
+    }
+    catch (const FlashVerificationError &e)
+    {
+        std::cerr << fmt::format("Firmware verification failed (VME address 0x{:08x}): {}\n", vmeAddress, e.to_string().toLocal8Bit().constData());
+        return 1;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << fmt::format("Firmware verification failed (VME address 0x{:08x}): {}\n", vmeAddress, e.what());
+        return 1;
+    }
+
+    return 0;
+}
+
+static const Command VerifyFirmwareCommand
+{
+    .name = "verify-firmware",
+    .help = unindent(R"~(
+Usage: verify-firmware --firmware=<file|dir> [--vme-address=<addr>] [--area=<area>]
+
+    Compares the given MVP firmware package/file with the contents of the
+    specified destination device and area.
+
+Options:
+    --firmware=<file|dir>
+        Path to the input file or directory. Usually a *.mvp file but can also be single *.bin or *.hex files.
+
+    --vme-address=<addr>
+        32-bit VME address of the target device. Must be an MDPP-style device supporting the MVP protocol.
+
+    --area=<area>
+        Flash area to write the firmware to. Not needed if a *.mvp package is
+        used as these usually contain the target area encoded in the contained filenames.
+
+Example:
+    # Connect to mvlc-0124 via ethernet and verify it's running FW0045.
+    mvlc-mvp-updater verify-firmware --mvlc mvlc-0124 --firmware ~/MVLC_FW0045.mvp --vme-address 0xffff0000
+
+)~"),
+    .exec = verify_firmware_command
+};
+
 DEF_EXEC_FUNC(boot_module_command)
 {
     (void) self; (void) argc; (void) argv;
@@ -675,6 +831,7 @@ int main(int argc, char *argv[])
     ctx.commands.insert(ScanbusCommand);
     ctx.commands.insert(DumpMemoryCommand);
     ctx.commands.insert(WriteFirmwareCommand);
+    ctx.commands.insert(VerifyFirmwareCommand);
     ctx.commands.insert(BootModuleCommand);
 
     {
