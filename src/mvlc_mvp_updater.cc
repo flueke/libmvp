@@ -603,6 +603,15 @@ DEF_EXEC_FUNC(verify_firmware_command)
     try
     {
         MvlcMvpFlash flash(mvlc, vmeAddress);
+
+        auto targetDeviceType = flash.read_otp().get_device().trimmed();
+
+        if (!check_device_type_match(targetDeviceType, firmware,
+            [](const QString &msg) { std::cout << msg.toLocal8Bit().constData() << "\n"; }))
+        {
+            return 1;
+        }
+
         mesytec::mvp::FirmwareWriter writer(firmware, &flash);
         writer.set_do_erase(false);
         writer.set_do_program(false);
