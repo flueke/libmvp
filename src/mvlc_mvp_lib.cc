@@ -17,6 +17,12 @@ using namespace mesytec::mvlc;
 // continuing. Value 1000 ^= 12.5 us.
 static const unsigned PostFifoWriteStackWaitCycles = 100000;
 
+inline u32 get_next_stack_reference()
+{
+    static u32 nextStackReference = 0;
+    return nextStackReference++;
+}
+
 std::error_code enable_flash_interface(MVLC &mvlc, u32 moduleBase)
 {
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
@@ -298,11 +304,11 @@ std::error_code set_verbose_mode(MVLC &mvlc, u32 moduleBase, bool verbose)
 // Extracts the low bytes from the 32-bit words in the stack response. Takes
 // care of stack continuations. Stops once output_fifo_flags::InvalidRead is
 // set.
-void fill_page_buffer_from_stack_output(std::vector<u8> &pageBuffer, const std::vector<u32> stackOutput)
+void fill_page_buffer_from_stack_output(std::vector<u8> &pageBuffer, const std::vector<u32> stackOutput, u32 stackRef)
 {
     assert(stackOutput.size() > 3);
     assert(is_stack_buffer(stackOutput.at(0)));
-    assert(stackOutput.at(1) == 0x13370001u);
+    assert(stackOutput.at(1) == stackRef);
 
     auto logger = mvlc::get_logger("mvlc_mvp_lib");
     pageBuffer.clear();
@@ -315,7 +321,7 @@ void fill_page_buffer_from_stack_output(std::vector<u8> &pageBuffer, const std::
         if (is_stack_buffer(word))
         {
             assert(view.size() >= 2);
-            assert(view[1] == 0x13370001u);
+            assert(view[1] == stackRef);
             view.remove_prefix(2); // skip over the stack buffer header and the marker
         }
         else if (is_stack_buffer_continuation(word) || is_blockread_buffer(word))
@@ -359,8 +365,9 @@ std::error_code read_page(
     // Note: the REF instruction does not mirror itself to the output fifo.
     // Instead the page data starts immediately.
 
+    u32 stackRef = get_next_stack_reference();
     StackCommandBuilder sb;
-    sb.addWriteMarker(0x13370001u);
+    sb.addWriteMarker(stackRef);
     sb.addVMEWrite(moduleBase + InputFifoRegister, mesytec::mvp::opcodes::REF, vme_amods::A32, VMEDataWidth::D16);
     sb.addVMEWrite(moduleBase + InputFifoRegister, addr[0], vme_amods::A32, VMEDataWidth::D16);
     sb.addVMEWrite(moduleBase + InputFifoRegister, addr[1], vme_amods::A32, VMEDataWidth::D16);
@@ -386,7 +393,7 @@ std::error_code read_page(
         return ec;
     }
 
-    fill_page_buffer_from_stack_output(pageBuffer, readBuffer);
+    fill_page_buffer_from_stack_output(pageBuffer, readBuffer, stackRef);
 
     if (pageBuffer.size() != bytesToRead)
         logger->warn("read_page(): wanted {} bytes, got {} bytes",
@@ -469,7 +476,7 @@ std::error_code write_page2(
             return ec;
 
     StackCommandBuilder sb;
-    sb.addWriteMarker(0x13370001u);
+    sb.addWriteMarker(get_next_stack_reference());
     // EFW - enable flash write
     sb.addVMEWrite(moduleBase + InputFifoRegister, 0x80,  vme_amods::A32, VMEDataWidth::D16);
     sb.addVMEWrite(moduleBase + InputFifoRegister, 0xCD,  vme_amods::A32, VMEDataWidth::D16);
@@ -526,7 +533,7 @@ std::error_code write_page2(
         }
 
         sb = {};
-        sb.addWriteMarker(0x13370001u);
+        sb.addWriteMarker(get_next_stack_reference());
     }
 
     assert(pageIter == pageBuffer.end());
@@ -592,7 +599,7 @@ std::error_code write_page3(
     auto tStart = std::chrono::steady_clock::now();
 
     StackCommandBuilder sb;
-    sb.addWriteMarker(0x13370001u);
+    sb.addWriteMarker(get_next_stack_reference());
     // EFW - enable flash write
     sb.addVMEWrite(moduleBase + InputFifoRegister, 0x80,  vme_amods::A32, VMEDataWidth::D16);
     sb.addVMEWrite(moduleBase + InputFifoRegister, 0xCD,  vme_amods::A32, VMEDataWidth::D16);
@@ -697,11 +704,10 @@ std::error_code write_page4(
 
     static const std::vector<u8> EfwRequest = { mesytec::mvp::opcodes::EFW, 0xCD, 0xAB };
     static const unsigned ExpectedFlashResponseSize = 5; // Efw is 3 + 0xff + statusbyte
-    static const u32 StackReferenceMarker = 0x13370001u;
+    const u32 StackReferenceMarker = get_next_stack_reference();
     // Response structure: 0xF3 stack frame header, reference marker word, 0xF5
     // block frame, data words from vme reads.
     static const unsigned ExpectedStackResponseSize = 3 + ExpectedFlashResponseSize;
-
 
     StackCommandBuilder sb;
     // Initial marker so that stackTransaction() has a reference word.
@@ -780,7 +786,7 @@ std::error_code write_page4(
     }
 
     std::vector<u8> flashResponse;
-    fill_page_buffer_from_stack_output(flashResponse, stackResponse);
+    fill_page_buffer_from_stack_output(flashResponse, stackResponse, StackReferenceMarker);
 
     if (!check_response(EfwRequest, flashResponse))
     {
@@ -819,7 +825,7 @@ std::error_code write_pages(
 
     static const std::vector<u8> EfwRequest = { mesytec::mvp::opcodes::EFW, 0xCD, 0xAB };
     static const unsigned ExpectedFlashResponseSize = EfwRequest.size() + 2; // mirror of the EfwRequest + fifo 0xff + fifo status
-    static const u32 StackReferenceMarker = 0x13370001u;
+    const u32 StackReferenceMarker = get_next_stack_reference();
     auto tStart = std::chrono::steady_clock::now();
 
     unsigned expectedResponseSize = 2; // 0xF3 stack frame header + reference marker word
@@ -836,7 +842,7 @@ std::error_code write_pages(
 
     StackCommandBuilder sb;
     // Initial marker so that stackTransaction() has a reference word.
-    sb.addWriteMarker(StackReferenceMarker);
+    sb.addWriteMarker(get_next_stack_reference());
 
     for (const auto &pageBuffer: { page1, page2 })
     {

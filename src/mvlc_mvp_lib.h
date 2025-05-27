@@ -141,7 +141,7 @@ std::error_code erase_section(
     MVLC &mvlc, u32 moduleBase, u8 index);
 
 void fill_page_buffer_from_stack_output(
-    std::vector<u8> &pageBuffer, const std::vector<u32> stackOutput);
+    std::vector<u8> &pageBuffer, const std::vector<u32> stackOutput, u32 stackRef);
 
 
 std::error_code read_flash_memory(
