@@ -61,6 +61,7 @@ void FirmwareWriter::write_part(const FirmwarePartPtr &pp,
     if (do_erase()) {
       emit status_message(QString("Erasing section %1").arg(section));
       m_flash->erase_section(section);
+      emit status_message(QString("Erased section %1").arg(section));
     }
   } else if (section == constants::otp_section) {
     emit status_message("Not erasing OTP section");
@@ -249,6 +250,7 @@ void KeysHandler::write_keys()
   if (keys_info.need_to_erase()) {
     emit status_message("Erasing keys section");
     m_flash->erase_section(constants::keys_section);
+    emit status_message("Erased keys section");
   }
 
   auto free_slots = m_flash->get_free_key_slots().values();

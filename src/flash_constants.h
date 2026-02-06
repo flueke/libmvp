@@ -89,11 +89,11 @@ namespace mvp
     const QSet<uchar> valid_sections = {{0, 1, 2, 3, 8, 9, 10, 11, 12}};
     const QSet<uchar> non_area_specific_sections = {{0, 1, 2, 3}};
 
-    const int default_timeout_ms =  3000;
-    const int erase_timeout_ms   = 60000;
-    const int data_timeout_ms    = 10000;
-    const int init_timeout_ms    =  1000;
-    const int recover_timeout_ms =   100;
+    const int default_timeout_ms =   3000;
+    const int erase_timeout_ms   = 240000;
+    const int data_timeout_ms    =  10000;
+    const int init_timeout_ms    =   1000;
+    const int recover_timeout_ms =    100;
   } // ns constants
 
   namespace keys
