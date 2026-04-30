@@ -15,9 +15,18 @@ namespace mesytec::mvp
 // the VMMR16 firmware. This smoothes out those differences.
 using DeviceTypeTranslationTable = QMap<QString, QString>;
 
+// Access to the static translation table.
 const DeviceTypeTranslationTable &get_device_type_translation_table();
+
+// Translates the given OTP device type to the device type used for matching.
 QString translate_device_type(const QString &otpDeviceType);
 
+// Returns true if the given firmware part matches the device type read from
+// OTP, false otherwise.
+bool check_device_type_match(const QString &otp_devicetype, const FirmwarePart &part);
+
+// Returns true if at least one area specific firmware part matches the device
+// type read from OTP, false otherwise.
 bool check_device_type_match(
     const QString &otpDeviceType,
     const FirmwareArchive &firmware,

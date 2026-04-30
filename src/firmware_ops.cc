@@ -2,6 +2,7 @@
 #include <algorithm>
 #include "flash.h"
 #include "instruction_interpreter.h"
+#include "device_type_check.h"
 
 namespace mesytec
 {
@@ -18,8 +19,18 @@ FirmwareWriter::FirmwareWriter(const FirmwareArchive &firmware,
 void FirmwareWriter::write()
 {
   auto non_area_specific_parts = m_firmware.get_non_area_specific_parts();
-  auto area_specific_parts = m_firmware.get_area_specific_parts();
+  auto all_area_specific_parts = m_firmware.get_area_specific_parts();
   const auto selected_area = m_flash->read_area_index();
+  const auto otp_devicetype = m_flash->read_otp().get_device();
+
+  // Keep only the parts that match the device type obtained from the OTP in here.
+  FirmwarePartList area_specific_parts;
+
+  std::copy_if(std::begin(all_area_specific_parts), std::end(all_area_specific_parts),
+      std::back_inserter(area_specific_parts),
+      [&](const FirmwarePartPtr &pp) {
+        return check_device_type_match(otp_devicetype, *pp);
+      });
 
   m_flash->set_verbose(false);
 

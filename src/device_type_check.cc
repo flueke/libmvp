@@ -29,12 +29,33 @@ QString translate_device_type(const QString &deviceType)
     return get_device_type_translation_table().value(deviceType.trimmed(), deviceType);
 }
 
+bool check_device_type_match(const QString &otp_devicetype, const FirmwarePart &part)
+{
+    auto deviceType = translate_device_type(otp_devicetype); // e.g. "MDPP-32" -> "MDPP32"
+
+    if (!part.has_base())
+        return false;
+
+    auto partBase = part.get_base();
+
+    // Compare the translated device type against the start of the OTP string
+    // data, up until the first underscore.
+
+    if (auto underscorePos = partBase.indexOf('_'); underscorePos != -1)
+    {
+        partBase = partBase.left(underscorePos);
+    }
+
+    return deviceType.toLower() == partBase.toLower();
+}
+
 bool check_device_type_match(
     const QString &otpDeviceType,
     const FirmwareArchive &firmware,
     std::function<void (const QString &)> logger)
 {
     auto deviceType = translate_device_type(otpDeviceType.trimmed()); // e.g. "MDPP-32" -> "MDPP32"
+    size_t matchesFound = 0;
 
     for (const auto &part: firmware.get_area_specific_parts())
     {
@@ -42,20 +63,36 @@ bool check_device_type_match(
         continue;
 
         auto partBase = part->get_base();
-        // Prefix match of the firmware part base against the translated device
-        // type, both lowercased.
-        if (!partBase.toLower().startsWith(deviceType.toLower()))
+        if (!check_device_type_match(otpDeviceType, *part))
         {
             if (logger)
             {
-                logger(QSL("Firmware '%1' does not match target device type '%2'! Aborting.")
+                logger(QSL("Firmware '%1' does not match target device type '%2'! Ignoring.")
                     .arg(partBase).arg(deviceType));
             }
-            return false;
+            continue;
         }
+        matchesFound++;
     }
 
-    return true;
+    for (const auto &part: firmware.get_non_area_specific_parts())
+    {
+        if (!part->has_base())
+            continue;
+
+        auto partBase = part->get_base();
+        if (!check_device_type_match(otpDeviceType, *part))
+        {
+            if (logger)            {
+                logger(QSL("Firmware '%1' does not match target device type '%2'! Ignoring.")
+                    .arg(partBase).arg(deviceType));
+            }
+            continue;
+        }
+        matchesFound++;
+    }
+
+    return matchesFound > 0;
 }
 
 }
