@@ -36,7 +36,14 @@ bool check_device_type_match(const QString &otp_devicetype, const FirmwarePart &
     if (!part.has_base())
         return false;
 
+    // Partbase if the basename of the firmware part.
     auto partBase = part.get_base();
+
+    // Special handling for OTP files which we usually start with 'OTP_'.
+    if (partBase.startsWith("OTP_", Qt::CaseInsensitive))
+    {
+        partBase = partBase.mid(4); // Remove "OTP_" prefix
+    }
 
     // Compare the translated device type against the start of the OTP string
     // data, up until the first underscore.
