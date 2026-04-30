@@ -451,6 +451,7 @@ void MVPLabGui::write_firmware()
   const bool do_program     = steps & FirmwareSteps::Step_Program;
   const bool do_verify      = steps & FirmwareSteps::Step_Verify;
 
+  // Read the OTP to determine the device type string.
   try {
     auto otp = run_in_thread_wait_in_loop<OTP>([&] {
       auto connector = getActiveConnector();
@@ -459,11 +460,6 @@ void MVPLabGui::write_firmware()
       return flash->read_otp();
     }, m_object_holder, m_fw);
 
-    if (!check_device_type_match(otp.get_device(), m_firmware,
-        [this](const QString &msg) { append_to_log(msg); }))
-    {
-      return;
-    }
   } catch (const std::exception &e) {
     append_to_log(QString(e.what()));
     return;
@@ -484,6 +480,7 @@ void MVPLabGui::write_firmware()
       flash->set_area_index(area_index);
 
       FirmwareWriter fw_writer(m_firmware, flash);
+      fw_writer.allow_otp_writes(true);
 
       fw_writer.set_do_erase(do_erase);
       fw_writer.set_do_program(do_program);

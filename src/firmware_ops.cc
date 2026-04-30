@@ -67,21 +67,26 @@ void FirmwareWriter::write_part(const FirmwarePartPtr &pp,
     m_flash->set_area_index(*area);
   }
 
-  if (section != constants::otp_section) {
-
-    if (do_erase()) {
+  if (do_erase()) {
+    if (section == constants::otp_section && !do_allow_otp_writes()) {
+      emit status_message(QString("Skipping erase of OTP section %1 since OTP writes are not allowed")
+          .arg(section));
+    }
+    else {
       emit status_message(QString("Erasing section %1").arg(section));
       m_flash->erase_section(section);
       emit status_message(QString("Erased section %1").arg(section));
     }
-  } else if (section == constants::otp_section) {
-    emit status_message("Not erasing OTP section");
   }
 
   if (is_binary_part(pp)) {
     auto contents = pp->get_contents();
 
-    if (contents.isEmpty()) {
+    if (section == constants::otp_section && !do_allow_otp_writes()) {
+      emit status_message(QString("Skipping programming of OTP section %1 since OTP writes are not allowed")
+          .arg(section));
+
+    } else if (contents.isEmpty()) {
       emit status_message(QString("File %1: empty file -> erase only")
           .arg(pp->get_filename()));
 
@@ -106,29 +111,34 @@ void FirmwareWriter::write_part(const FirmwarePartPtr &pp,
       ->get_instructions();
 
     if (section == constants::otp_section) {
+      if (!do_allow_otp_writes()) {
+        emit status_message(QString("Skipping programming of OTP section %1 since OTP writes are not allowed")
+            .arg(section));
 
-      auto mem = generate_memory(instructions);
+      } else {
+        auto mem = generate_memory(instructions);
 
-      emit status_message(QString("File %1: OTP: generated %2 bytes of memory")
-          .arg(pp->get_filename())
-          .arg(mem.size()));
+        emit status_message(QString("File %1: OTP: generated %2 bytes of memory")
+            .arg(pp->get_filename())
+            .arg(mem.size()));
 
-      if (do_program()) {
-        emit status_message(QString("File %1: writing %2 bytes of data")
-            .arg(pp->get_filename()).arg(mem.size()));
+        if (do_program()) {
+          emit status_message(QString("File %1: writing %2 bytes of data")
+              .arg(pp->get_filename()).arg(mem.size()));
 
-        m_flash->write_memory({0, 0, 0}, section, gsl::span(mem));
-      }
+          m_flash->write_memory({0, 0, 0}, section, gsl::span(mem));
+        }
 
-      if (do_verify()) {
-        emit status_message(QString("File %1: verifying memory")
-            .arg(pp->get_filename()));
+        if (do_verify()) {
+          emit status_message(QString("File %1: verifying memory")
+              .arg(pp->get_filename()));
 
-        auto res = m_flash->verify_memory({0, 0, 0}, section, gsl::span(mem));
+          auto res = m_flash->verify_memory({0, 0, 0}, section, gsl::span(mem));
 
-        qDebug() << res.to_string();
+          qDebug() << res.to_string();
 
-        if (!res) throw FlashVerificationError(res);
+          if (!res) throw FlashVerificationError(res);
+        }
       }
 
     } else {

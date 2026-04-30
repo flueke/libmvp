@@ -31,6 +31,9 @@ class FirmwareWriter: public QObject
     void set_do_program(bool b) { m_do_program = b; }
     void set_do_verify(bool b)  { m_do_verify = b; }
 
+    bool set_allow_otp_writes(bool allow) { m_allow_otp_writes = allow; }
+    bool do_allow_otp_writes() const { return m_allow_otp_writes; }
+
   private:
     void write_part(const FirmwarePartPtr &pp,
         uchar section,
@@ -42,6 +45,7 @@ class FirmwareWriter: public QObject
     bool m_do_erase = true;
     bool m_do_program = true;
     bool m_do_verify = false;
+    bool m_allow_otp_writes = false;
 };
 
 typedef QList<Key> KeyList;
