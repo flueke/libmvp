@@ -18,19 +18,55 @@ FirmwareWriter::FirmwareWriter(const FirmwareArchive &firmware,
 
 void FirmwareWriter::write()
 {
-  auto non_area_specific_parts = m_firmware.get_non_area_specific_parts();
-  auto all_area_specific_parts = m_firmware.get_area_specific_parts();
+  const auto all_non_area_specific_parts = m_firmware.get_non_area_specific_parts();
+  const auto all_area_specific_parts = m_firmware.get_area_specific_parts();
   const auto selected_area = m_flash->read_area_index();
   const auto otp_devicetype = m_flash->read_otp().get_device();
 
-  // Keep only the parts that match the device type obtained from the OTP in here.
+  // Split both firmware part lists into matched and unmatched lists so we can
+  // process only the relevant parts.
+
+  FirmwarePartList non_area_specific_parts;
   FirmwarePartList area_specific_parts;
+
+  std::copy_if(std::begin(all_non_area_specific_parts), std::end(all_non_area_specific_parts),
+      std::back_inserter(non_area_specific_parts),
+      [&](const FirmwarePartPtr &pp) {
+        return check_device_type_match(otp_devicetype, *pp);
+      });
 
   std::copy_if(std::begin(all_area_specific_parts), std::end(all_area_specific_parts),
       std::back_inserter(area_specific_parts),
       [&](const FirmwarePartPtr &pp) {
         return check_device_type_match(otp_devicetype, *pp);
       });
+
+  {
+    FirmwarePartList unmatched_non_area_specific_parts;
+    FirmwarePartList unmatched_area_specific_parts;
+
+    std::copy_if(std::begin(all_non_area_specific_parts), std::end(all_non_area_specific_parts),
+        std::back_inserter(unmatched_non_area_specific_parts),
+        [&](const FirmwarePartPtr &pp) {
+          return !check_device_type_match(otp_devicetype, *pp);
+        });
+
+    std::copy_if(std::begin(all_area_specific_parts), std::end(all_area_specific_parts),
+        std::back_inserter(unmatched_area_specific_parts),
+        [&](const FirmwarePartPtr &pp) {
+          return !check_device_type_match(otp_devicetype, *pp);
+        });
+
+      for (const auto &pp: unmatched_non_area_specific_parts) {
+        emit status_message(QString("Skipping non area-specific part %1 since it does not match the OTP device type '%2'.")
+            .arg(pp->get_filename()).arg(otp_devicetype));
+      }
+
+      for (const auto &pp: unmatched_area_specific_parts) {
+        emit status_message(QString("Skipping area-specific part %1 since it does not match the OTP device type '%2'.")
+            .arg(pp->get_filename()).arg(otp_devicetype));
+      }
+  }
 
   m_flash->set_verbose(false);
 
