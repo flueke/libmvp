@@ -31,6 +31,13 @@ QString translate_device_type(const QString &deviceType)
 
 bool check_device_type_match(const QString &otp_devicetype, const FirmwarePart &part)
 {
+    if (part.get_section() == constants::otp_section)
+    {
+        // To be able to initially program the OTP we have to skip the check
+        // here as the device does not have a type yet. Chicken and egg problem.
+        return true;
+    }
+
     auto deviceType = translate_device_type(otp_devicetype); // e.g. "MDPP-32" -> "MDPP32"
 
     if (!part.has_base())
@@ -38,12 +45,6 @@ bool check_device_type_match(const QString &otp_devicetype, const FirmwarePart &
 
     // Partbase if the basename of the firmware part.
     auto partBase = part.get_base();
-
-    // Special handling for OTP files which we usually start with 'OTP_'.
-    if (partBase.startsWith("OTP_", Qt::CaseInsensitive))
-    {
-        partBase = partBase.mid(4); // Remove "OTP_" prefix
-    }
 
     // Compare the translated device type against the start of the OTP string
     // data, up until the first underscore.
