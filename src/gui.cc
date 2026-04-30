@@ -480,7 +480,7 @@ void MVPLabGui::write_firmware()
       flash->set_area_index(area_index);
 
       FirmwareWriter fw_writer(m_firmware, flash);
-      fw_writer.set_allow_otp_writes(true);
+      fw_writer.set_allow_otp_writes(this->get_allow_otp_writes());
 
       fw_writer.set_do_erase(do_erase);
       fw_writer.set_do_program(do_program);
@@ -801,6 +801,15 @@ void MVPLabGui::on_actionAbout_Qt_triggered()
 void MVPLabGui::on_actionShowAdvanced_toggled(bool checked)
 {
   advanced_widget_gb_->setVisible(checked);
+}
+
+void MVPLabGui::set_allow_otp_writes(bool allow)
+{
+  m_allow_otp_writes = allow;
+}
+bool MVPLabGui::get_allow_otp_writes() const
+{
+  return m_allow_otp_writes;
 }
 
 void MVPLabGui::_show_logview_context_menu(const QPoint &pos)

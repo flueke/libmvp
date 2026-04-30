@@ -50,6 +50,10 @@ class MVPLabGui: public QMainWindow
 
     QTextBrowser *getLogview();
 
+    // To allow or disallow writing to the OTP. Must be set before the user starts the write action.
+    void set_allow_otp_writes(bool allow);
+    bool get_allow_otp_writes() const;
+
   protected:
     virtual void closeEvent(QCloseEvent *event) override;
 
@@ -131,6 +135,7 @@ class MVPLabGui: public QMainWindow
     QGroupBox *advanced_widget_gb_;
     QProgressBar *m_progressbar;
     FirmwareArchive m_firmware;
+    bool m_allow_otp_writes = false;
 };
 
 class KeySelectionDialog: public QDialog
