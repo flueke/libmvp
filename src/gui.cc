@@ -480,7 +480,7 @@ void MVPLabGui::write_firmware()
       flash->set_area_index(area_index);
 
       FirmwareWriter fw_writer(m_firmware, flash);
-      fw_writer.allow_otp_writes(true);
+      fw_writer.set_allow_otp_writes(true);
 
       fw_writer.set_do_erase(do_erase);
       fw_writer.set_do_program(do_program);

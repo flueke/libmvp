@@ -31,7 +31,7 @@ class FirmwareWriter: public QObject
     void set_do_program(bool b) { m_do_program = b; }
     void set_do_verify(bool b)  { m_do_verify = b; }
 
-    bool set_allow_otp_writes(bool allow) { m_allow_otp_writes = allow; }
+    void set_allow_otp_writes(bool allow) { m_allow_otp_writes = allow; }
     bool do_allow_otp_writes() const { return m_allow_otp_writes; }
 
   private:
