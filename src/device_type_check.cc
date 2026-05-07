@@ -54,7 +54,7 @@ bool check_device_type_match(const QString &otp_devicetype, const FirmwarePart &
         partBase = partBase.left(underscorePos);
     }
 
-    return deviceType.toLower() == partBase.toLower();
+    return deviceType.toLower().trimmed() == partBase.toLower().trimmed();
 }
 
 bool check_device_type_match(
