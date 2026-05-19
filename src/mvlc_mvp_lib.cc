@@ -68,7 +68,7 @@ std::error_code clear_output_fifo(MVLC &mvlc, u32 moduleBase)
         if (fifoValue & output_fifo_flags::InvalidRead)
             break;
 
-        logger->debug("  clear_output_fifo: 0x{:04x} = 0x{:08x}", OutputFifoRegister, fifoValue);
+        logger->debug("  clear_output_fifo: got fifo value 0x{:04x} = 0x{:08x}", OutputFifoRegister, fifoValue);
 
         if (auto elapsed = std::chrono::steady_clock::now() - tStart;
             elapsed >= MaxResponseWaitTime)
@@ -183,6 +183,8 @@ std::error_code read_response(MVLC &mvlc, u32 moduleBase, std::vector<u8> &dest)
         {
             return ec;
         }
+
+        logger->debug("  read_response: got fifo value 0x{:04x} = 0x{:08x}", OutputFifoRegister, fifoValue);
 
         if (fifoValue & output_fifo_flags::InvalidRead)
         {

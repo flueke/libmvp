@@ -37,6 +37,9 @@ u32 MvlcMvpFlash::getVmeAddress() const
     return vmeAddress_;
 }
 
+// If it's not enabled yet, try to enable the modules flash interface.
+// Returns false and a diagnostic message if it detects a hardware/firmware
+// combination that does not support firmware updates through VME.
 void MvlcMvpFlash::maybe_enable_flash_interface()
 {
     using namespace mesytec::mvlc::vme_modules;
