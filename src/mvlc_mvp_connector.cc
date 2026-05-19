@@ -134,9 +134,14 @@ std::pair<bool, std::string> can_flash_through_vme(const QVariantMap &deviceInfo
 std::pair<bool, std::string> can_flash_through_vme(mvlc::u32 hwId, mvlc::u32 fwId)
 {
     if (hwId == mesytec::mvlc::vme_modules::HardwareIds::MVLC && fwId < 0x0036u)
-        return std::make_pair(false, std::string("Error: MVLC firmware upgrades through VME require MVLC firmware >= FW0036"));
+        return std::make_pair(false, std::string("Error: MVLC firmware upgrades through VME require MVLC firmware >= FW0036."));
+
+    if (hwId == mesytec::mvlc::vme_modules::HardwareIds::MTDC_32)
+        return std::make_pair(false, std::string("Error: MTDC-32 cannot be flashed through VME. Use the onboard USB instead. Older MTDCs (pre v40) need the xilinx hardware programmer."));
+
+    if (hwId == mesytec::mvlc::vme_modules::HardwareIds::MDLL_v2)
+        return std::make_pair(false, std::string("Error: MDLL_v2 cannot be flashed through VME. Use the onboard USB instead."));
 
     return std::make_pair(true, std::string());
 }
-
 }
